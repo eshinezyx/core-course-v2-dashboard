@@ -1,0 +1,2348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>核心课数据 · 维度分析版</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/js/hx-config.js"></script>
+<link rel="stylesheet" href="assets/css/hx-theme.css">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+/* ===== 行课画像：雷达 + 逐讲趋势（V9 结构） ===== */
+.hx-portrait-body{display:grid;grid-template-columns:minmax(300px,32%) minmax(0,68%);gap:0;padding:0 20px 16px;align-items:stretch}
+.hx-portrait-radar{min-width:0;border-right:1px solid #eef2f8;padding-right:16px}
+#hx-radar{width:100%;max-width:360px;height:322px;margin:0 auto;display:block}
+.hx-r-grid{fill:none;stroke:#e2e9f4;stroke-width:1}
+.hx-r-area{fill:rgba(47,111,237,.13);stroke:#2f6fed;stroke-width:2}
+.hx-r-label{font-size:9px;cursor:pointer}
+.hx-r-value{font-size:10px;font-weight:600;cursor:pointer}
+.hx-r-label.focused,.hx-r-value.focused{font-weight:800}
+.hx-portrait-trend{min-width:0;padding-left:16px;display:flex;flex-direction:column}
+#hx-trend{width:100%;height:280px;display:block}
+#hx-trend.hidden,#hx-dim-trend.hidden{display:none!important}
+.hx-grid-line{stroke:#eef2f8;stroke-width:1}
+.hx-axis-line{stroke:#c3cfe3;stroke-width:1}
+.hx-axis-text{font-size:10px;fill:#94a3bd}
+.hx-axis-text.selected{fill:#d96b43;font-weight:700}
+.hx-series{fill:none;stroke-width:2.2}
+.hx-series.practice{stroke-dasharray:8 4;stroke-width:2.6}
+.hx-series.focused{stroke-width:3.4}
+.hx-selection-band{fill:rgba(245,158,11,.14);stroke:#d97706;stroke-width:1.4}
+.hx-focus-band{fill:rgba(217,107,67,.10);stroke:rgba(217,107,67,.55)}
+.hx-chart-point{cursor:pointer}
+.hx-chart-point.focused{stroke-width:2.6}
+.hx-chart-hit{fill:transparent;cursor:pointer}
+.hx-legend{display:flex;gap:8px 18px;flex-wrap:wrap;padding:6px 0 8px;border-bottom:1px solid #eef2f8;margin-bottom:4px}
+.hx-legend-group{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap}
+.hx-legend-group+.hx-legend-group{padding-left:14px;border-left:1px solid #eef2f8}
+.hx-legend-tag{padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600}
+.hx-legend-btn{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#5c6b84;cursor:pointer;border:0;background:none;padding:2px 0}
+.hx-legend-btn.off{opacity:.35;text-decoration:line-through}
+.hx-trend-select{height:28px;border:1px solid #dbe3ef;border-radius:7px;background:#fff;color:#3d5178;padding:0 24px 0 8px;font-size:11px;outline:none}
+.hx-trend-select:focus{border-color:#8cabe0;box-shadow:0 0 0 2px rgba(47,111,237,.08)}
+.hx-trend-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;flex-wrap:nowrap}
+.hx-trend-title{display:flex;align-items:center;gap:10px;min-width:70px;flex:1;white-space:nowrap;overflow:hidden}
+.hx-trend-title #trend-hint{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hx-trend-controls{display:flex;align-items:center;gap:8px;flex:0 0 auto;white-space:nowrap}
+#trend-mode button{padding-left:9px;padding-right:9px}
+#trend-dim-controls{flex-wrap:nowrap}
+#trend-dim-controls .hx-trend-select:first-child{width:104px}
+#trend-dim-controls .hx-trend-select:last-child{width:112px}
+#hx-dim-trend{width:100%;height:280px}
+.hx-seg{display:inline-flex;background:#f1f4f8;border-radius:8px;padding:2px}
+.hx-seg button{padding:4px 11px;font-size:11px;color:#5c6b84;border:0;background:none;border-radius:6px;cursor:pointer}
+.hx-seg button.active{background:#fff;color:#2f6fed;font-weight:600;box-shadow:0 1px 3px rgba(30,60,120,.12)}
+.hx-ov-metrics{display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap;min-width:0}
+.hx-ov-metric{display:inline-flex;align-items:center;gap:7px;padding:3px 0;border:0;background:transparent;color:#6f7f99;font-size:11px;cursor:pointer;white-space:nowrap;opacity:.72;transition:opacity .15s,color .15s}
+.hx-ov-metric:hover{opacity:.9;color:#3d5178}
+.hx-ov-metric.active{opacity:1;color:var(--mc);font-weight:700}
+.hx-ov-metric-mark{position:relative;display:inline-block;width:28px;height:12px;flex:0 0 28px}
+.hx-ov-metric-mark:before{content:"";position:absolute;left:0;right:0;top:5px;height:2px;border-radius:2px;background:var(--mc)}
+.hx-ov-metric-mark:after{content:"";position:absolute;left:9px;top:1px;width:10px;height:10px;border:2px solid var(--mc);border-radius:50%;background:#fff;box-sizing:border-box}
+.hx-ov-metric.active .hx-ov-metric-mark:after{left:8px;top:0;width:12px;height:12px;border-width:3px}
+/* ===== 基地表现（概览卡片内竖条对比） ===== */
+.hx-vbars{height:186px;display:flex;align-items:stretch;gap:22px;padding:20px 18px 0}
+.hx-vcluster{flex:1;min-width:0;display:grid;grid-template-rows:auto}
+.hx-vbars-inner{display:flex;align-items:flex-end;justify-content:center;gap:18px;border-bottom:1px solid #e6ecf5}
+.hx-vbar{width:min(84px,30%);min-height:3px;border-radius:5px 5px 0 0;background:var(--mc);position:relative;cursor:pointer;transition:.16s}
+.hx-vbar:hover{filter:saturate(1.12);opacity:.9}
+.hx-vbar b{position:absolute;left:50%;top:-18px;transform:translateX(-50%);font-size:12px;font-weight:700;color:#163563;white-space:nowrap;font-variant-numeric:tabular-nums}
+.hx-vbar span{position:absolute;left:50%;bottom:-26px;transform:translateX(-50%);font-size:11px;color:#94a3bd;white-space:nowrap}
+.hx-vlegend{display:flex;justify-content:center;gap:16px;margin-top:26px;color:#5c6b84;font-size:11px}
+.hx-vlegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+/* ===== 基地数据概览卡片 ===== */
+.hx-ov-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 20px 12px;border-bottom:1px solid #eef2f8}
+.hx-ov-grid{display:grid;grid-template-columns:minmax(0,.96fr) minmax(0,1.04fr);align-items:stretch;gap:12px;padding:12px 20px 18px}
+.hx-ov-card{border:1px solid #e6ecf5;border-radius:12px;background:#fff;min-width:0;min-height:380px;padding:12px;display:flex;flex-direction:column}
+.hx-ov-card.wide{grid-column:1/-1;min-height:0}
+.hx-risk-badge{display:inline-flex;align-items:center;border-radius:999px;padding:1px 6px;background:#fff0eb;color:#c2411c;font-size:10px;font-weight:700;white-space:nowrap}
+.hx-risk-row{background:#fff8f5!important;border-left:3px solid #f97316!important}
+.hx-scope-tabs{display:flex;gap:6px;border-bottom:1px solid #eef2f8;padding:0 0 10px;margin-bottom:10px}
+.hx-scope-tabs button{border:0;background:#f1f4f8;color:#5c6b84;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer}
+.hx-scope-tabs button.active{background:#e8f0fe;color:#165dff;font-weight:700}
+.hx-scope-role-tab{display:inline-flex;align-items:center;gap:6px}
+.hx-role-risk-count{display:inline-flex;align-items:center;border-radius:999px;padding:1px 6px;background:#fff0eb;color:#c2411c;font-size:9px;font-weight:700;line-height:1.5;white-space:nowrap}
+.hx-role-risk-count.zero{background:#e8edf4;color:#8492aa;font-weight:600}
+.hx-risk-filter{margin-left:auto;color:#c2411c!important;background:#fff0eb!important}
+.hx-person-filterbar{padding:10px 12px;border-bottom:1px solid #eef2f8;background:#fbfcfe}
+.hx-person-filter-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:7px}
+.hx-person-filter-head b{font-size:11px;color:#3d5178}
+.hx-person-filter-summary{font-size:10px;color:#60708d;font-variant-numeric:tabular-nums}
+.hx-person-filter-row{display:flex;align-items:flex-start;gap:8px;margin-top:6px}
+.hx-person-filter-label{flex:0 0 34px;padding-top:4px;color:#8492aa;font-size:10px}
+.hx-person-filter-chips{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.hx-person-filter-chip{border:1px solid #dbe3ef;border-radius:6px;background:#fff;color:#60708d;padding:3px 9px;font-size:10px;line-height:1.5;cursor:pointer}
+.hx-person-filter-chip:hover{border-color:#9bb7e8;color:#2f5fac}
+.hx-person-filter-chip.active{border-color:#8eb1ef;background:#eaf2ff;color:#165dff;font-weight:700}
+.hx-person-row{display:grid;grid-template-columns:minmax(190px,1fr) 86px 190px;gap:10px;align-items:center;padding:9px 10px;border-bottom:1px solid #f0f4fa;cursor:pointer;font-size:12px}
+.hx-person-row:hover{background:#f7faff}.hx-person-row:last-child{border-bottom:0}
+.hx-person-row .meta{display:block;font-size:10px;color:#94a3bd;margin-top:2px}
+.hx-person-row .num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#163563}
+.hx-person-row .rank{text-align:right;color:#60708d;font-variant-numeric:tabular-nums}
+.hx-person-row .rank-line{display:flex;align-items:center;justify-content:flex-end;gap:6px;line-height:1.45;white-space:nowrap}
+.hx-person-row .rank-scope{color:#8492aa;font-size:9px}
+.hx-person-row .rank b{color:#3d5178;font-size:10px}
+.hx-person-row .rank-line.secondary{margin-top:2px}.hx-person-row .rank-line.secondary .rank-scope{color:#9aa6b9}
+.hx-drawer-focus{display:block}
+.hx-drawer-focus-main{min-width:0}
+.hx-drawer-focus-label{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12px;color:#2f5fac}
+.hx-drawer-metrics{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.hx-drawer-metric-card{position:relative;min-width:0;text-align:left;border:1px solid #dbe3ef;border-radius:14px;background:#fff;padding:11px 12px;box-shadow:0 4px 12px rgba(30,60,120,.05);cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s,transform .15s}
+.hx-drawer-metric-card:hover{border-color:#9bb7e8;transform:translateY(-1px)}
+.hx-drawer-metric-card.active{border:2px solid #2f6fed;background:#f3f7ff;box-shadow:0 5px 16px rgba(47,111,237,.12);padding:10px 11px}
+.hx-drawer-metric-name{display:flex;align-items:center;gap:6px;min-height:30px;color:#60708d;font-size:11px;line-height:1.3}
+.hx-drawer-metric-name i{width:7px;height:7px;border-radius:50%;background:var(--mc);flex:0 0 auto}
+.hx-drawer-metric-card.active .hx-drawer-metric-name{color:#165dff;font-weight:700}
+.hx-drawer-metric-value{display:block;margin-top:5px;color:#163563;font-size:21px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+.hx-drawer-metric-current{position:absolute;right:7px;top:6px;color:#165dff;font-size:8px;font-weight:700}
+.hx-person-list-head{display:grid;grid-template-columns:minmax(190px,1fr) 86px 190px;gap:10px;padding:7px 10px;background:#f7f9fc;border-bottom:1px solid #eef2f8;color:#94a3bd;font-size:10px}
+.hx-person-list-head span:nth-child(n+2){text-align:right}
+.hx-person-detail-tabs{display:flex;align-items:center;gap:4px;padding:10px 12px 0;border-bottom:1px solid #eef2f8;background:#fff}
+.hx-person-detail-tabs [data-person-tab]{border:0;border-bottom:2px solid transparent;background:transparent;color:#60708d;padding:8px 13px;font-size:12px;cursor:pointer}
+.hx-person-detail-tabs [data-person-tab].active{border-color:#2f6fed;color:#165dff;font-weight:700}
+.hx-person-detail-action{margin-left:auto;align-self:center;margin-bottom:8px}
+.hx-lecture-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;border-bottom:1px solid #eef2f8;background:#fff}
+.hx-lecture-toolbar-title{font-size:13px;font-weight:600;color:#172b4d}
+.hx-lecture-toolbar-title span{margin-left:8px;color:#94a3bd;font-size:10px;font-weight:400}
+.hx-lecture-risk-toggle{flex:0 0 auto;border:0;border-radius:7px;background:#fff0eb;color:#c2411c;padding:6px 10px;font-size:11px;cursor:pointer}
+.hx-lecture-risk-toggle.active{background:#ffe2d8;color:#b93816;font-weight:700;box-shadow:inset 0 0 0 1px #ffc7b3}
+.hx-lecture-risk-toggle:disabled{background:#f1f4f8;color:#a7b2c4;cursor:not-allowed;box-shadow:none}
+.hx-child-toolbar{display:flex;justify-content:flex-end;padding:10px 12px;border-bottom:1px solid #eef2f8;background:#fff}
+.hx-child-risk-toggle{border:0;border-radius:7px;background:#fff0eb;color:#c2411c;padding:6px 10px;font-size:11px;cursor:pointer}
+.hx-child-risk-toggle.active{background:#ffe2d8;color:#b93816;font-weight:700;box-shadow:inset 0 0 0 1px #ffc7b3}
+.hx-child-risk-toggle:disabled{background:#f1f4f8;color:#a7b2c4;cursor:not-allowed;box-shadow:none}
+.hx-lecture-scroll{position:relative;overflow-x:auto;overscroll-behavior-x:contain}
+.hx-lecture-table{min-width:1220px;border-collapse:separate;border-spacing:0}
+.hx-lecture-table th,.hx-lecture-table td{white-space:nowrap}
+.hx-lecture-table th:first-child,.hx-lecture-table td:first-child{position:sticky;left:0;z-index:2;width:112px;min-width:112px;max-width:112px;background:#fff;box-shadow:1px 0 0 #e6ecf5}
+.hx-lecture-table thead th:first-child{z-index:3;background:#f4f7fb}
+.hx-lecture-table th:nth-last-child(2),.hx-lecture-table td:nth-last-child(2){position:sticky;right:116px;z-index:2;width:190px;min-width:190px;max-width:190px;background:#fff;box-shadow:-1px 0 0 #e6ecf5}
+.hx-lecture-table th:last-child,.hx-lecture-table td:last-child{position:sticky;right:0;z-index:2;width:116px;min-width:116px;max-width:116px;background:#fff}
+.hx-lecture-table thead th:nth-last-child(-n+2){z-index:3;background:#f4f7fb}
+.hx-lecture-table tr.hx-risk-row td:first-child,.hx-lecture-table tr.hx-risk-row td:nth-last-child(-n+2){background:#fff8f5}
+.hx-lecture-table tr.is-current td{background:#fff8eb}
+.hx-lecture-table tr.is-current td:first-child,.hx-lecture-table tr.is-current td:nth-last-child(-n+2){background:#fff3d6}
+.hx-lecture-table .is-focus-col{background:#eef4ff!important;color:#165dff;font-weight:800}
+.hx-current-lecture{display:inline-flex;margin-left:6px;padding:1px 5px;border-radius:5px;background:#fff0d2;color:#b45309;font-size:9px;font-weight:700}
+.hx-person-org{font-size:11px;color:#60708d;margin-top:3px}
+.hx-detail-ranks{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:5px;color:#52637f;font-size:10px}
+.hx-detail-ranks span{display:inline-flex;align-items:center;gap:4px;border-radius:6px;background:rgba(255,255,255,.66);padding:2px 7px}
+.hx-detail-ranks b{color:#163563;font-variant-numeric:tabular-nums}
+.hx-table-ranks{display:grid;gap:2px;justify-items:end;line-height:1.25}
+.hx-table-ranks span{display:flex;gap:5px;color:#8492aa;font-size:9px}.hx-table-ranks b{color:#3d5178;font-size:10px;font-variant-numeric:tabular-nums}
+@media(max-width:1100px){.hx-drawer-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.hx-matrix-mode{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hx-ov-caption{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap}
+.hx-ov-caption h3{font-size:13px;font-weight:700;color:#163563;margin:0;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.hx-ov-caption h3 span{color:#94a3bd;font-size:10px;font-weight:400}
+.hx-sgd-detail{margin-top:7px;padding-top:10px;border-top:1px solid #eef2f8}
+.hx-sgd-detail-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:7px}
+.hx-sgd-detail-head b{font-size:12px;color:#163563}
+.hx-sgd-detail-head button{border:1px solid #b9cef1;border-radius:7px;background:#fff;color:#2f5fac;padding:5px 10px;font-size:10px;cursor:pointer}
+.hx-sgd-detail-head button:hover{background:#f3f7ff;border-color:#8eb1ef}
+.hx-sgd-empty{display:grid;place-items:center;min-height:112px;border:1px dashed #dbe3ef;border-radius:9px;background:#fbfcfe;color:#94a3bd;font-size:11px;text-align:center;padding:12px}
+.hx-sgd-base-list{display:grid;gap:5px}
+.hx-sgd-base-item{display:grid;grid-template-columns:26px 48px minmax(0,1fr) 58px;align-items:center;gap:8px;padding:6px 8px;border:1px solid transparent;border-radius:8px;background:#f8fafc;cursor:pointer;text-align:left;transition:.15s}
+.hx-sgd-base-item:hover{border-color:#b9cef1;background:#f3f7ff;transform:translateX(1px)}
+.hx-sgd-base-item.risk{border-color:#f97316;background:#fff8f5}
+.hx-sgd-base-rank{display:grid;place-items:center;width:24px;height:20px;border-radius:6px;background:#e8eef7;color:#60708d;font-size:9px;font-weight:700;font-style:normal}
+.hx-sgd-base-item:first-child .hx-sgd-base-rank{background:#fff0d2;color:#a16207}
+.hx-sgd-base-name{display:flex;align-items:center;gap:5px;color:#3d5178;font-size:11px;font-weight:700}
+.hx-sgd-base-name:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--bc);flex:0 0 auto}
+.hx-sgd-base-item strong{text-align:right;color:#163563;font-size:12px;font-variant-numeric:tabular-nums}
+.hx-sgd-base-track{height:6px;border-radius:5px;background:#e7edf5;overflow:hidden}
+.hx-sgd-base-fill{display:block;height:100%;border-radius:inherit;background:var(--mc)}
+.hx-matrix-export{border:1px solid #b9cef1;border-radius:7px;background:#fff;color:#2f5fac;padding:6px 11px;font-size:11px;cursor:pointer;white-space:nowrap}
+.hx-matrix-export:hover{background:#f3f7ff;border-color:#8eb1ef}
+.hx-lecture-matrix-scroll{position:relative;max-height:68vh;overflow:auto;overscroll-behavior:contain;background:#fff}
+.hx-lecture-matrix{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:12px}
+.hx-lecture-matrix th,.hx-lecture-matrix td{border-right:1px solid #eef2f8;border-bottom:1px solid #eef2f8;white-space:nowrap}
+.hx-lecture-matrix thead th{position:sticky;background:#f5f8fc;color:#60708d;text-align:center;font-weight:600;z-index:4}
+.hx-lecture-matrix thead tr:first-child th{top:0;height:34px}
+.hx-lecture-matrix thead tr:nth-child(2) th{top:34px;height:36px}
+.hx-lecture-matrix .hx-lmx-path{position:sticky;left:0;width:228px;min-width:228px;max-width:228px;background:#fff;z-index:3;box-shadow:2px 0 5px rgba(31,52,91,.06)}
+.hx-lecture-matrix thead .hx-lmx-path{background:#f5f8fc;z-index:7;text-align:left;padding-left:16px}
+.hx-lecture-matrix .hx-lmx-lecture{color:#163563;font-weight:800;border-bottom-color:#d9e3f2}
+.hx-lecture-matrix .hx-lmx-metric{width:96px;min-width:96px;max-width:96px;font-size:10px;padding:5px 6px}
+.hx-lecture-matrix tbody tr:hover td{background:#f8faff}
+.hx-lecture-matrix tbody tr:hover .hx-lmx-path{background:#f8faff}
+.hx-lmx-path-inner{display:flex;align-items:center;gap:6px;padding:8px 12px;min-height:47px}
+.hx-lmx-toggle{display:grid;place-items:center;width:20px;height:20px;border:1px solid #dbe3ef;border-radius:5px;background:#fff;color:#60708d;font-size:10px;cursor:pointer;flex:0 0 auto}
+.hx-lmx-leaf{width:20px;height:2px;border-radius:2px;background:#dbe3ef;flex:0 0 auto}
+.hx-lmx-label{min-width:0}
+.hx-lmx-label b,.hx-lmx-label small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hx-lmx-label b{color:#163563;font-size:12px}.hx-lmx-label small{margin-top:2px;color:#94a3bd;font-size:9px}
+.hx-lmx-cell{padding:5px 6px;text-align:center;background:#fff;cursor:pointer}
+.hx-lmx-cell>div{border-radius:7px;padding:5px 6px;min-height:35px}
+.hx-lmx-value{display:block;color:#163563;font-weight:800;font-size:11px;font-variant-numeric:tabular-nums}
+.hx-lmx-rank{display:block;margin-top:2px;color:#8492aa;font-size:8px}
+.hx-lmx-empty{color:#a7b2c4}
+@media(max-width:900px){.hx-sgd-base-item{grid-template-columns:26px 54px minmax(0,1fr) 64px}}
+.hx-ov-scroll{max-height:268px;overflow:auto;padding-right:4px;flex:1}
+.hx-ov-scroll.tall{max-height:340px}
+.hx-empty{display:grid;place-items:center;color:#94a3bd;font-size:12px;padding:28px 0;flex:1}
+.hx-fold{border-top:1px solid #f0f4fa;padding:7px 0 2px}
+.hx-fold:first-child{border-top:0;padding-top:0}
+.hx-fold summary{display:flex;align-items:center;gap:6px;margin-bottom:6px;color:#3d5178;font-size:11px;font-weight:600;cursor:pointer;list-style:none}
+.hx-fold summary::-webkit-details-marker{display:none}
+.hx-fold summary:before{content:"›";display:inline-grid;place-items:center;width:15px;height:15px;border-radius:4px;background:#e8f0fe;color:#2f6fed;transform:rotate(90deg);transition:.15s;font-size:11px}
+.hx-fold:not([open]) summary:before{transform:rotate(0)}
+.hx-fold:not([open]) summary{margin-bottom:0}
+.hx-rank-row{display:grid;grid-template-columns:minmax(86px,32%) minmax(0,1fr) 54px;gap:8px;align-items:center;font-size:11px;padding:3.5px 0;cursor:pointer;border-radius:5px}
+.hx-rank-row:hover{background:#f6f9ff}
+.hx-rank-label{min-width:0}
+.hx-rank-label b,.hx-rank-label small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hx-rank-label small{margin-top:1px;color:#94a3bd;font-size:9px}
+.hx-rank-track{height:9px;border-radius:5px;background:#edf1f7;overflow:hidden}
+.hx-rank-fill{height:100%;border-radius:inherit;background:var(--mc)}
+.hx-rank-value{text-align:right;font-weight:700;font-size:11px;color:#163563;font-variant-numeric:tabular-nums}
+.hx-heat-row{display:grid;grid-template-columns:minmax(140px,34%) minmax(0,1fr) 58px;gap:8px;align-items:center;padding:4.5px 0;border-bottom:1px solid #f0f4fa;font-size:10px;cursor:pointer;border-radius:5px}
+.hx-heat-row:hover{background:#f6f9ff}
+.hx-heat-row:last-child{border-bottom:0}
+.hx-heat-path{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:#163563;font-weight:500}
+.hx-heat-bar{height:19px;border-radius:4px;background:var(--heat);position:relative;overflow:hidden}
+.hx-heat-bar:after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--width);background:var(--mc);opacity:.5;border-radius:4px}
+.hx-heat-bar span{position:relative;z-index:1;display:block;padding:3.5px 7px;color:#29473d;font-size:9px}
+.hx-heat-value{text-align:right;font-weight:700;font-size:11px;color:#163563;font-variant-numeric:tabular-nums}
+#hx-tip{position:fixed;z-index:80;pointer-events:none;background:#fff;border:1px solid #e6ecf5;border-radius:10px;box-shadow:0 8px 24px rgba(20,40,90,.14);padding:8px 11px;font-size:11px;display:none;min-width:190px}
+.sd-sortable:hover{filter:brightness(1.35)}
+.sd-sortable.sd-active{font-weight:700}
+.sd-sortable .sd-mark{display:inline-block;min-width:18px;margin-left:2px;font-size:10px;color:#163563;font-weight:700}
+#hx-tip b{display:block;color:#163563;margin-bottom:4px}
+#hx-tip .tr{display:flex;justify-content:space-between;gap:18px;padding:1.5px 0}
+#hx-tip .tr em{color:#94a3bd;font-style:normal}
+#hx-tip .tr strong{color:#163563;font-variant-numeric:tabular-nums}
+@media(max-width:1100px){.hx-portrait-body{grid-template-columns:250px minmax(0,1fr)}.hx-ov-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body class="font-sans">
+<div id="sidebar"></div>
+<div class="ml-60 min-h-screen bg-paper flex flex-col">
+    <div id="topbar"></div>
+    <main class="flex-1 p-6 space-y-4" id="main"></main>
+</div>
+
+<script src="assets/js/mock-data.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/hx-data.js"></script>
+<script src="assets/js/hx-role.js"></script>
+<script src="assets/js/hx-ui.js"></script>
+<script src="assets/js/hx-matrix.js"></script>
+<script>
+// v2 原型暂时收敛为单菜单；只覆盖本页运行时配置，不修改共享 common.js。
+HX.MENU = [{ key: 'core-course', title: '核心课数据', icon: '📚', page: 'core-course-v2.html' }];
+HX.renderSidebar('core-course');
+HX.renderTopbar('核心课数据 · 维度分析版');
+
+// ================= 常量配置 =================
+const TERM_LECTURES = { '1': [1, 2, 3, 4, 5, 6], '2': [7, 8, 9, 10, 11], '3': [12, 13, 14, 15, 16] };
+const FB_CFG = {
+    years: [{ v: '26', label: '26-27学年', short: '26' }],
+    seasons: [{ v: 'autumn', label: '秋季', char: '秋' }],
+    periods: [{ v: '1', label: '第1期' }, { v: '2', label: '第2期' }, { v: '3', label: '第3期' }],
+    periodLectures: TERM_LECTURES,
+    grades: ORG.grades,
+    subjects: ORG.subjects,
+    lectureCount: HXD.LECTURE_COUNT,
+};
+function filterDefaults() {
+    return { year: '26', season: 'autumn', periods: ['1', '2', '3'], grades: [], subjects: [], lectureMode: 'latest', lectures: [] };
+}
+
+// v2 核心课指标口径：仅在本页面运行时扩展 HXD，不修改共享数据文件，原版不受影响。
+const _baseAgg = HXD.agg;
+// 共享聚合器会读取 cycles（老带新筛选字段），但其脚本未在默认路径初始化该变量。
+// 核心课不使用此筛选；在本页补齐默认值，避免聚合在绘制前中断。
+var cyc = null;
+function stableRatio(text) {
+    let h = 2166136261;
+    for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0) / 4294967295;
+}
+HXD.UNITS.forEach(u => u.lessons.forEach((L, i) => {
+    if (L.v2) return;
+    const replayHit = !L.at && stableRatio(`${u.id}|${i}|effective`) < .075;
+    const firstPassHit = !!(L.sb && L.cr && stableRatio(`${u.id}|${i}|first-pass`) < .68);
+    const scoreSeed = stableRatio(`${u.id}|${i}|score`);
+    L.v2 = {
+        effective: L.at || replayHit ? 1 : 0,
+        firstPass: firstPassHit ? 1 : 0,
+        score: L.sb ? +(L.cr ? 85 + scoreSeed * 15 : 45 + scoreSeed * 39).toFixed(1) : null,
+    };
+}));
+function coreAgg(units, opt) {
+    cyc = opt && opt.cycles ? new Set(opt.cycles.map(String)) : null;
+    const a = _baseAgg(units, opt);
+    const lectures = opt && opt.lectures ? opt.lectures : null;
+    a.effectiveN = 0; a.effectiveD = 0;
+    a.firstPassN = 0; a.firstPassD = 0;
+    a.scoreSum = 0; a.scoreCount = 0;
+    units.forEach(u => u.lessons.forEach((L, i) => {
+        if (lectures && !lectures.has(i + 1)) return;
+        a.effectiveD++; a.effectiveN += L.v2.effective;
+        // 当前 mock 每个正课课节均视为有作业；接真实数据后由 hasHomework 字段过滤。
+        a.firstPassD++; a.firstPassN += L.v2.firstPass;
+        if (L.v2.score != null) { a.scoreSum += L.v2.score; a.scoreCount++; }
+    }));
+    return a;
+}
+HXD.agg = coreAgg;
+const M = HXD.METRICS;
+Object.assign(M, {
+    attend: {
+        name: '直播参课率', short: '直播参课', color: '#165dff', group: 'core', better: 'higher', rate: true,
+        formula: '∑每节课直播参课人数 ÷ ∑每节课在班人数（仅正课，课前课后不计入）',
+        num: a => HXD.pct(a.attendN, a.attendD),
+    },
+    effective: {
+        name: '有效参课率', short: '有效参课', color: '#0ea5e9', group: 'core', better: 'higher', rate: true,
+        formula: '∑每节课有效参课人次 ÷ ∑每节课在班人数（正课直播参课≥30分钟或观看回放时长≥50%；课前课后不计入）',
+        num: a => HXD.pct(a.effectiveN, a.effectiveD),
+    },
+    deep: {
+        name: '深参率', short: '深参', color: '#13c2c2', group: 'core', better: 'higher', rate: true,
+        formula: '∑每节课直播极限深参人次数 ÷ ∑每节课直播参课人次（正课直播参课时长占比≥80%；课前课后不计入）',
+        num: a => HXD.pct(a.deepN, a.deepD),
+    },
+    firstPass: {
+        name: '首通率', short: '首通', color: '#f59e0b', group: 'core', better: 'higher', rate: true,
+        formula: '∑有作业课节中首次提交作业即满分的人数 ÷ ∑有作业课节在班人数',
+        num: a => HXD.pct(a.firstPassN, a.firstPassD),
+    },
+    correct: {
+        name: '作业得分率', short: '作业得分', color: '#22c55e', group: 'core', better: 'higher', rate: true,
+        formula: '有作业得分率用户的得分率平均数',
+        num: a => a.scoreCount > 0 ? a.scoreSum / a.scoreCount : null,
+    },
+});
+HXD.lectureTrend = (units, metricKey, opt) => Array.from({ length: HXD.LECTURE_COUNT }, (_, i) => {
+    const lecture = i + 1;
+    const a = HXD.agg(units, Object.assign({}, opt, { lectures: new Set([lecture]) }));
+    return { lecture, date: HXD.LECTURE_DATES[i], value: M[metricKey].num(a) };
+});
+const DOMAINS = {
+    attendance: { label: '参课表现', tag: '参课', keys: ['attend', 'effective', 'deep', 'note'] },
+    practice: { label: '作业练习', tag: '练习', keys: ['submit', 'firstPass', 'correct', 'diff'] },
+};
+const ALL_KEYS = [...DOMAINS.attendance.keys, ...DOMAINS.practice.keys];   // 8 指标
+// 基地概览业务阈值：百分比指标填百分数，差值填百分点；null 表示尚未配置。
+// 后续接入接口时只需用接口结果覆盖同名键，无需修改图表判定逻辑。
+const METRIC_ATTENTION_THRESHOLDS = {
+    attend: null,
+    effective: null,
+    deep: null,
+    note: null,
+    submit: null,
+    firstPass: null,
+    correct: null,
+    diff: null,
+};
+const RADAR_KEYS = ['attend', 'effective', 'deep', 'submit', 'firstPass', 'correct', 'note']; // 差值不进雷达
+const MATRIX_KEYS = ALL_KEYS;
+const SHAPES = { attend: 'circle', effective: 'diamond', deep: 'square', note: 'triangle', submit: 'circle', firstPass: 'square', correct: 'diamond', diff: 'triangle' };
+const BASE_COLORS = ['#2f6fed', '#13c2c2', '#f59e0b'];
+const SERIES_COLORS = ['#2f6fed', '#13c2c2', '#f59e0b', '#8b5cf6', '#d96b43', '#22c55e', '#e0489a', '#0e9f9f'];
+const GRADE_ORDER = ['一年级', '二年级', '三年级', '四年级', '五年级', '六年级'];
+const TREND_DIMS = [
+    { key: 'base', name: '基地' },
+    { key: 'subject', name: '学科' },
+    { key: 'grade', name: '年级' },
+    { key: 'isNewDim', name: '新老生' },
+    { key: 'subjectLeader', name: '学科负责人' },
+    { key: 'groupLeader', name: '组长' },
+    { key: 'teacherName', name: '辅导' },
+];
+const DIM_PRESETS = [
+    { name: '年级 × 基地', dims: ['grade', 'base'] },
+    { name: '年级 × 学科负责人', dims: ['grade', 'subjectLeader'] },
+    { name: '基地 × 学科负责人', dims: ['base', 'subjectLeader'] },
+    { name: '年级 × 组长', dims: ['grade', 'groupLeader'] },
+];
+// 基地数据概览：卡片维度链配置（跨角色共享注册表，抽屉 spec.card 反查）
+const CARDS = {
+    bs: { title: '哪个基地、学科组合的当前指标需要重点关注？', note: '横轴＝学科，颜色＝基地', fields: ['base', 'subject'] },
+    sgd: { title: '哪个年级、学科组合的当前指标表现偏弱？', note: '点击组合查看基地分布', fields: ['subject', 'grade'] },
+    sg: { title: '各学科下，哪些组长的当前指标需要优先关注？', note: '低值单元格已强调', fields: ['subject', 'groupLeader'] },
+    gsb: { title: '哪个年级、学科、基地组合的当前指标处于低位？', note: '行＝年级 × 学科，列＝基地', fields: ['grade', 'subject', 'base'], wide: true },
+    gg: { title: '按年级 × 组长', note: '学科负责人视角', fields: ['grade', 'groupLeader'], wide: true },
+    sgl: { title: '按学科 × 组长', note: '年级组长视角', fields: ['subject', 'groupLeader'], wide: true },
+    gt: { title: '按年级 × 辅导', note: '组长视角', fields: ['grade', 'teacherName'], wide: true },
+    c1: { title: '按基地', note: '三基地同级比较', fields: ['base'] },
+    c2: { title: '按基地 × 年级', note: '基地内比较年级', fields: ['base', 'grade'], fold: 1 },
+    c3: { title: '按年级 × 学科负责人', note: '年级内比较负责人', fields: ['grade', 'subjectLeader'], fold: 1 },
+    c4: { title: '按年级 × 学科负责人 × 组长', note: '负责人范围内比较组长', fields: ['grade', 'subjectLeader', 'groupLeader'], fold: 2 },
+    c5: { title: '按学科负责人', note: '负责人同级比较', fields: ['subjectLeader'], rank: true },
+    glRank: { title: '组长维度排名', note: '组长同级比较', fields: ['groupLeader'], wide: true, rank: true },
+    glTeacher: { title: '辅导排名', note: '柱色 = 归属组长', fields: ['teacherName'], wide: true },
+    tRank: { title: '辅导维度排名', note: '辅导同级比较', fields: ['teacherName'], wide: true, rank: true },
+};
+// 角色 → 概览卡片序列（学科负责人/年级组长共用卡配置，范围差异由 scopedUnits 承担）
+const ROLE_CARDS = {
+    manager: ['bs', 'sgd'],
+    subjectOwner: ['bs', 'sgd'],
+    gradeLeader: ['bs', 'sgd'],
+    groupLeader: ['bs', 'sgd'],
+};
+// 组织架构链：抽屉「子维度分布」取卡片维度末维的下一级（基地→学科负责人→年级组长→组长→辅导）
+const ORG_NEXT = { base: 'subjectLeader', subject: 'subjectLeader', grade: 'gradeLeader', subjectLeader: 'gradeLeader', gradeLeader: 'groupLeader', groupLeader: 'teacherName', teacherName: null };
+const LEVEL_COLORS = { lead: '#c9efe1', normal: '#e7f0fb', low: '#ffebbd', risk: '#f9d7dc' };
+
+// ================= 页面状态 =================
+const state = {
+    draft: filterDefaults(),
+    applied: filterDefaults(),
+    visibleMetrics: new Set(['attend']),
+    focusedMetric: 'attend',
+    focusLecture: null,               // 点击趋势点临时聚焦某讲（不改顶部筛选）
+    trendMode: 'overall',             // overall=总体趋势；dimension=维度趋势
+    trendDim: 'base',
+    trendDimMetric: 'deep',
+    ov: { domain: 'attendance', key: 'attend', subject: null, sgdSelection: null },  // 基地数据概览
+    dims: ['grade', 'base'],          // 明细透视图维度链
+    matrixMode: 'summary',
+};
+window.__hxPageState = state;
+
+// ================= 数据流 =================
+function scopedUnits() {
+    const f = state.applied;
+    if (f.year !== '26' || f.season !== 'autumn') return HX_ROLE.scopeUnits([], 'core');
+    let us = HXD.UNITS;
+    if (f.grades.length) us = us.filter(u => f.grades.includes(u.grade));
+    if (f.subjects.length) us = us.filter(u => f.subjects.includes(u.subject));
+    return HX_ROLE.scopeUnits(us, 'core');
+}
+// 人员“全国同级”比较池：继承顶部业务筛选，但明确绕过角色/我的范围权限。
+// 权限外单元仅参与聚合排名，人员姓名和明细永远只从 scopedUnits/node.units 渲染。
+function comparisonUnits() {
+    const f = state.applied;
+    if (f.year !== '26' || f.season !== 'autumn') return [];
+    let us = HXD.UNITS;
+    if (f.grades.length) us = us.filter(u => f.grades.includes(u.grade));
+    if (f.subjects.length) us = us.filter(u => f.subjects.includes(u.subject));
+    return us;
+}
+// 组内排名使用组长完整团队，不受顶部年级/学科收窄；讲次范围仍由聚合 opt 统一控制。
+function teamComparisonUnits() {
+    const f = state.applied;
+    return f.year === '26' && f.season === 'autumn' ? HXD.UNITS : [];
+}
+function aggOpt() {
+    if (state.focusLecture) return { lectures: new Set([state.focusLecture]) };
+    const s = HXUI.fbLectureSet(state.applied, FB_CFG);
+    return { lectures: s.size ? s : null };
+}
+function selectedLectureSet() {
+    const applied = HXUI.fbLectureSet(state.applied, FB_CFG);
+    return applied.size ? applied : new Set(Array.from({ length: HXD.LECTURE_COUNT }, (_, i) => i + 1));
+}
+function matrixAggOpt() {
+    const s = selectedLectureSet();
+    return { lectures: s.size === HXD.LECTURE_COUNT ? null : s };
+}
+function lectureScopeText(opt) {
+    const values = opt && opt.lectures ? [...opt.lectures].sort((a,b) => a-b) : Array.from({ length: HXD.LECTURE_COUNT }, (_, i) => i + 1);
+    return values.length === 1 ? `第 ${values[0]} 讲` : values.length === HXD.LECTURE_COUNT ? '全部已结束讲次' : `已选第 ${values.join('、')} 讲汇总`;
+}
+function fmtM(key, v) {
+    if (v == null || isNaN(v)) return '—';
+    return v.toFixed(1) + (key === 'diff' ? 'pp' : '%');
+}
+function appliedLectureSelection() {
+    const set = HXUI.fbLectureSet(state.applied, FB_CFG);
+    return set.size > 0 && set.size < HXD.LECTURE_COUNT ? set : new Set();
+}
+function lectureSelectionSuffix(set = appliedLectureSelection()) {
+    if (!set.size) return '';
+    const nums = [...set].sort((a, b) => a - b);
+    return nums.length <= 6 ? ` · 已选第${nums.join('、')}讲` : ` · 已选${nums.length}个讲次`;
+}
+function matrixLectureValues() {
+    return [...selectedLectureSet()].sort((a, b) => a - b);
+}
+function matrixLectureFileLabel(lectures = matrixLectureValues()) {
+    if (!lectures.length) return '无讲次';
+    if (lectures.length === HXD.LECTURE_COUNT) return '全部讲次';
+    if (lectures.length === 1) return `第${lectures[0]}讲`;
+    const continuous = lectures.every((n, i) => i === 0 || n === lectures[i - 1] + 1);
+    return continuous ? `第${lectures[0]}-${lectures[lectures.length - 1]}讲` : `第${lectures.join('、')}讲`;
+}
+function matrixMetricExportName(key) {
+    return `${M[key].name}(${key === 'diff' ? '百分点' : '%'})`;
+}
+function matrixLeafNodes(units, dims = state.dims) {
+    const root = HXM.buildTree(units, dims);
+    const leaves = [];
+    (function walk(nodes) {
+        nodes.forEach(node => node.children.length ? walk(node.children) : leaves.push(node));
+    })(root);
+    return leaves;
+}
+function exportMatrixCsv(units) {
+    const leaves = matrixLeafNodes(units);
+    if (!leaves.length) return HXUI.toast('当前筛选范围暂无数据');
+    const dimNames = state.dims.map(key => (HXD.DIMENSIONS.find(dim => dim.key === key) || {}).name || key);
+    const lectures = matrixLectureValues();
+    const summary = state.matrixMode === 'summary';
+    const headers = summary
+        ? dimNames.concat(MATRIX_KEYS.map(matrixMetricExportName))
+        : dimNames.concat(lectures.flatMap(lecture => MATRIX_KEYS.map(key => `第${lecture}讲-${matrixMetricExportName(key)}`)));
+    const metricValue = (unitsInCell, key, opt) => {
+        const value = M[key].num(HXD.agg(unitsInCell, opt));
+        return value == null || !isFinite(value) ? '' : +value.toFixed(1);
+    };
+    const rows = leaves.map(node => {
+        const values = summary
+            ? MATRIX_KEYS.map(key => metricValue(node.units, key, matrixAggOpt()))
+            : lectures.flatMap(lecture => MATRIX_KEYS.map(key => metricValue(node.units, key, { lectures: new Set([lecture]) })));
+        return node.path.concat(values);
+    });
+    const csvCell = value => {
+        const text = String(value == null ? '' : value);
+        return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const csv = '\ufeff' + [headers].concat(rows).map(row => row.map(csvCell).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const now = new Date();
+    const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    link.href = url;
+    link.download = `核心课基地数据明细_${summary ? '汇总' : '逐讲'}_${matrixLectureFileLabel(lectures)}_${ymd}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    HXUI.toast(`已导出 ${rows.length} 条末级组合数据`);
+}
+function renderLectureMatrix(units) {
+    const table = document.querySelector('#matrix .hx-matrix-table');
+    if (!table) return;
+    const holder = table.parentElement;
+    const lectures = matrixLectureValues();
+    const root = HXM.buildTree(units, state.dims);
+    const nodeMap = new Map();
+    (function prepare(nodes) {
+        nodes.forEach(node => {
+            nodeMap.set(node.id, node);
+            node._lectureSiblings = nodes;
+            prepare(node.children);
+        });
+    })(root);
+    const rows = [];
+    (function walk(nodes) {
+        nodes.slice().sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')).forEach(node => {
+            rows.push(node);
+            if (!HXM.state.collapsed.has(node.id) && node.children.length) walk(node.children);
+        });
+    })(root);
+    const aggCache = new Map();
+    const aggregate = (node, lecture) => {
+        const cacheKey = `${node.id}|${lecture}`;
+        if (!aggCache.has(cacheKey)) aggCache.set(cacheKey, HXD.agg(node.units, { lectures: new Set([lecture]) }));
+        return aggCache.get(cacheKey);
+    };
+    const cellHtml = (node, lecture, key) => {
+        const value = M[key].num(aggregate(node, lecture));
+        if (value == null || !isFinite(value)) return `<td class="hx-lmx-cell" data-lmx-cell="${encodeURIComponent(node.id)}" data-lmx-lecture="${lecture}" data-lmx-metric="${key}"><div><span class="hx-lmx-value hx-lmx-empty">—</span><span class="hx-lmx-rank">暂无可比</span></div></td>`;
+        const siblings = node._lectureSiblings || [];
+        let level = { level: 'normal', rank: null, count: 0 };
+        if (siblings.length > 1) {
+            const values = siblings.map(sibling => M[key].num(aggregate(sibling, lecture)));
+            level = HXD.rankLevel(values, value, M[key].better);
+        }
+        return `<td class="hx-lmx-cell" data-lmx-cell="${encodeURIComponent(node.id)}" data-lmx-lecture="${lecture}" data-lmx-metric="${key}"><div class="hx-cell-${level.level}"><span class="hx-lmx-value">${fmtM(key, value)}</span><span class="hx-lmx-rank">${HXD.positionText(level.rank, level.count) || '暂无可比'}</span></div></td>`;
+    };
+    const width = 228 + lectures.length * MATRIX_KEYS.length * 96;
+    holder.className = 'hx-lecture-matrix-scroll';
+    holder.innerHTML = `<table class="hx-lecture-matrix" style="width:${width}px;min-width:100%">
+        <thead>
+            <tr><th class="hx-lmx-path" rowspan="2">组合路径</th>${lectures.map(lecture => `<th class="hx-lmx-lecture" colspan="${MATRIX_KEYS.length}">第${lecture}讲</th>`).join('')}</tr>
+            <tr>${lectures.flatMap(() => MATRIX_KEYS.map(key => `<th class="hx-lmx-metric" style="color:${M[key].color}">${M[key].name}</th>`)).join('')}</tr>
+        </thead>
+        <tbody>${rows.length ? rows.map(node => {
+            const collapsed = HXM.state.collapsed.has(node.id);
+            const hasKids = node.children.length > 0;
+            return `<tr data-lmx-row="${encodeURIComponent(node.id)}">
+                <td class="hx-lmx-path"><div class="hx-lmx-path-inner" style="padding-left:${12 + node.depth * 18}px">
+                    ${hasKids ? `<button class="hx-lmx-toggle" data-lmx-toggle="${encodeURIComponent(node.id)}">${collapsed ? '›' : '⌄'}</button>` : '<span class="hx-lmx-leaf"></span>'}
+                    <span class="hx-lmx-label"><b>${node.name}</b><small>${node.path.join(' / ')}</small></span>
+                </div></td>
+                ${lectures.flatMap(lecture => MATRIX_KEYS.map(key => cellHtml(node, lecture, key))).join('')}
+            </tr>`;
+        }).join('') : `<tr><td colspan="${1 + lectures.length * MATRIX_KEYS.length}" class="py-12 text-center text-muted">当前筛选范围暂无数据</td></tr>`}</tbody>
+    </table>`;
+    holder.querySelectorAll('[data-lmx-toggle]').forEach(button => button.onclick = event => {
+        event.stopPropagation();
+        const id = decodeURIComponent(button.dataset.lmxToggle);
+        HXM.state.collapsed.has(id) ? HXM.state.collapsed.delete(id) : HXM.state.collapsed.add(id);
+        render();
+    });
+    holder.querySelectorAll('[data-lmx-cell]').forEach(cell => cell.onclick = event => {
+        event.stopPropagation();
+        const node = nodeMap.get(decodeURIComponent(cell.dataset.lmxCell));
+        const lecture = +cell.dataset.lmxLecture;
+        if (node) openScopeDrawer(node, cell.dataset.lmxMetric, { opt: { lectures: new Set([lecture]) }, source: `基地数据明细 · 第${lecture}讲` });
+    });
+    holder.querySelectorAll('[data-lmx-row]').forEach(row => row.onclick = () => {
+        const node = nodeMap.get(decodeURIComponent(row.dataset.lmxRow));
+        if (node) openScopeDrawer(node, state.ov.key, { opt: matrixAggOpt(), source: '基地数据明细 · 逐讲' });
+    });
+}
+function trendRiskLectures(units, key) {
+    const rows = Array.from({ length: HXD.LECTURE_COUNT }, (_, i) => {
+        const lecture = i + 1;
+        const value = M[key].num(HXD.agg(units, { lectures: new Set([lecture]) }));
+        return { lecture, value };
+    }).filter(r => r.value != null && isFinite(r.value));
+    if (rows.length < 2) return new Set();
+    rows.sort((a, b) => M[key].better === 'lower' ? b.value - a.value : a.value - b.value);
+    return new Set(rows.slice(0, Math.max(1, Math.ceil(rows.length * .1))).map(r => r.lecture));
+}
+function riskLabel(key) { return `${M[key].name}需关注`; }
+const esc = encodeURIComponent;
+
+// ================= 主渲染 =================
+function render() {
+    const us = scopedUnits();
+    const opt = aggOpt();
+    const matrixOpt = matrixAggOpt();
+
+    document.getElementById('main').innerHTML = `
+        ${HXUI.filterBarV9Html(state, FB_CFG)}
+
+        <!-- ① 整体数据概览：行课画像 + 逐讲趋势 -->
+        <section class="bg-white rounded-2xl border border-hxline shadow-card">
+            <div class="px-5 pt-4 pb-3 border-b border-hxline-light flex items-center justify-between flex-wrap gap-2">
+                <h2 class="text-[16px] font-bold text-ink">整体数据概览</h2>
+                <div class="flex items-center gap-3">
+                    ${HX_ROLE.scopeSwitchHtml('core')}
+                </div>
+            </div>
+            <div class="hx-portrait-body">
+                <div class="hx-portrait-radar">
+                    <div class="text-[12px] font-semibold text-ink">汇总表现</div>
+                    <div class="text-[10px] text-muted mb-0.5">点击指标聚焦右侧趋势</div>
+                    <svg id="hx-radar" viewBox="0 0 260 250"></svg>
+                </div>
+                <div class="hx-portrait-trend">
+                    <div class="hx-trend-toolbar">
+                        <div class="hx-trend-title">
+                            <b class="text-[12px] text-ink">逐讲趋势</b>
+                            <span class="text-[10px] text-muted" id="trend-hint"></span>
+                        </div>
+                        <div class="hx-trend-controls">
+                            <div class="hx-seg" id="trend-mode">
+                                <button data-mode="overall">总体趋势</button>
+                                <button data-mode="dimension">维度趋势</button>
+                            </div>
+                            <div class="flex items-center gap-2" id="trend-overall-controls">
+                                <button id="hx-clear-focus" class="hidden text-[11px] px-2.5 py-1 rounded-md border border-[#e8b7a4] bg-[#fdf3ee] text-[#c05636] hover:bg-[#fbe9df]">返回筛选口径</button>
+                                <div class="hx-seg" id="trend-seg">
+                                    <button data-seg="attendance">只看参课</button>
+                                    <button data-seg="practice">只看练习</button>
+                                    <button data-seg="all">全部显示</button>
+                                </div>
+                            </div>
+                            <div class="hidden items-center gap-2" id="trend-dim-controls">
+                                <select class="hx-trend-select" id="trend-dim-select" aria-label="趋势拆分维度">
+                                    ${TREND_DIMS.map(d => `<option value="${d.key}" ${state.trendDim === d.key ? 'selected' : ''}>按${d.name}</option>`).join('')}
+                                </select>
+                                <select class="hx-trend-select" id="trend-metric-select" aria-label="趋势指标">
+                                    ${ALL_KEYS.map(k => `<option value="${k}" ${state.trendDimMetric === k ? 'selected' : ''}>${M[k].name}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hx-legend" id="hx-legend"></div>
+                    <svg id="hx-trend" viewBox="0 0 1200 280" preserveAspectRatio="none"></svg>
+                    <div id="hx-dim-trend" class="hidden"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ② 基地数据概览：分维度卡片 -->
+        <section class="bg-white rounded-2xl border border-hxline shadow-card">
+            <div class="px-5 pt-4 pb-3 flex items-center justify-between flex-wrap gap-2">
+                <h2 class="text-[16px] font-bold text-ink">基地数据概览</h2>
+                ${HX_ROLE.scopeSwitchHtml('core')}
+            </div>
+            <div class="hx-ov-toolbar">
+                <div class="hx-seg" id="ov-domains">
+                    ${Object.entries(DOMAINS).map(([d, cfg]) => `<button data-domain="${d}" class="${state.ov.domain === d ? 'active' : ''}">${cfg.label}</button>`).join('')}
+                </div>
+                <div class="hx-ov-metrics" id="ov-pills"></div>
+            </div>
+            <div class="hx-ov-grid">
+                ${(ROLE_CARDS[HX_ROLE.current] || ROLE_CARDS.manager).map(id =>
+                    `<article class="hx-ov-card ${CARDS[id].wide ? 'wide' : ''}" id="ov-${id}"></article>`).join('')}
+            </div>
+        </section>
+
+        <!-- ③ 基地数据明细：透视图 -->
+        <div id="matrix"></div>
+    `;
+
+    renderRadar(us, opt);
+    renderTrend(us);
+    renderBaseOverview(us, opt);
+    HXM.render({
+        mount: 'matrix',
+        units: us,
+        dims: state.dims,
+        metrics: MATRIX_KEYS,
+        opt: matrixOpt,
+        moduleId: 'core',
+        noScope: true,
+        headExtra: `<div class="hx-matrix-mode">${HX_ROLE.scopeSwitchHtml('core')}
+            <div class="hx-seg" id="matrix-mode"><button data-matrix-mode="summary">汇总</button><button data-matrix-mode="lecture">逐讲</button></div>
+            ${state.matrixMode === 'lecture' ? `<span class="text-[10px] text-muted">${matrixLectureFileLabel()} · ${matrixLectureValues().length}讲</span>` : ''}
+            <button type="button" id="matrix-export" class="hx-matrix-export">导出CSV</button>
+        </div>`,
+        title: '基地数据明细',
+        presets: DIM_PRESETS,
+        hideLegend: true,
+        onDimsChange: d => { state.dims = d; render(); },
+        onNodeClick: node => openScopeDrawer(node, state.ov.key, { opt: matrixOpt, source: '基地数据明细' }),
+        onCellClick: (node, k) => openScopeDrawer(node, k, { opt: matrixOpt, source: '基地数据明细' }),
+    });
+    if (state.matrixMode === 'lecture') renderLectureMatrix(us);
+    document.querySelectorAll('#matrix-mode button').forEach(b => {
+        b.classList.toggle('active', b.dataset.matrixMode === state.matrixMode);
+        b.onclick = () => { state.matrixMode = b.dataset.matrixMode; render(); };
+    });
+    const matrixExport = document.getElementById('matrix-export');
+    if (matrixExport) matrixExport.onclick = () => exportMatrixCsv(us);
+    HXUI.bindFilterBarV9(state, FB_CFG);
+}
+
+// ================= ① 行课画像：SVG 雷达 =================
+function renderRadar(us, opt) {
+    const svg = document.getElementById('hx-radar');
+    if (!svg) return;
+    const cx = 130, cy = 122, r = 72;
+    const N = RADAR_KEYS.length;
+    const ang = i => -Math.PI / 2 + i * 2 * Math.PI / N;
+    const pt = (scale, i) => `${(cx + Math.cos(ang(i)) * r * scale).toFixed(1)},${(cy + Math.sin(ang(i)) * r * scale).toFixed(1)}`;
+    const a = HXD.agg(us, opt);
+    let html = '';
+    [0.25, 0.5, 0.75, 1].forEach(l => html += `<polygon class="hx-r-grid" points="${RADAR_KEYS.map((_, i) => pt(l, i)).join(' ')}"/>`);
+    RADAR_KEYS.forEach((k, i) => html += `<line class="hx-r-grid" x1="${cx}" y1="${cy}" x2="${cx + Math.cos(ang(i)) * r}" y2="${cy + Math.sin(ang(i)) * r}"/>`);
+    const vals = RADAR_KEYS.map(k => M[k].num(a));
+    html += `<polygon class="hx-r-area" points="${RADAR_KEYS.map((k, i) => pt(Math.max(0, Math.min(100, vals[i] || 0)) / 100, i)).join(' ')}"/>`;
+    RADAR_KEYS.forEach((k, i) => {
+        const lx = cx + Math.cos(ang(i)) * (r + 20), ly = cy + Math.sin(ang(i)) * (r + 14);
+        const anchor = Math.cos(ang(i)) > 0.2 ? 'start' : Math.cos(ang(i)) < -0.2 ? 'end' : 'middle';
+        const foc = state.focusedMetric === k ? ' focused' : '';
+        html += `<text class="hx-r-label${foc}" data-radar="${k}" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anchor}" fill="${M[k].color}">${M[k].short}</text>
+            <text class="hx-r-value${foc}" data-radar="${k}" x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${anchor}" fill="${M[k].color}">${vals[i] == null ? '—' : vals[i].toFixed(1)}</text>`;
+    });
+    svg.innerHTML = html;
+    svg.querySelectorAll('[data-radar]').forEach(el => {
+        el.onclick = () => focusMetric(el.dataset.radar);
+    });
+}
+function focusMetric(key) {
+    state.trendMode = 'overall';
+    state.focusedMetric = key;
+    state.visibleMetrics = new Set([key]);
+    state.ov.key = key;
+    state.ov.domain = DOMAINS.attendance.keys.includes(key) ? 'attendance' : 'practice';
+    state.trendDimMetric = key;
+    render();
+    HXUI.toast(`已聚焦「${M[key].name}」逐讲趋势`);
+}
+
+// ================= ① 逐讲趋势：SVG 折线 =================
+function pointSvg(shape, x, y, color, lecture, key) {
+    const foc = state.focusLecture === lecture;
+    const size = foc ? 4.6 : 3.2;
+    const common = `class="hx-chart-point${foc ? ' focused' : ''}" data-lecture="${lecture}" data-metric="${key}" fill="#fff" stroke="${color}" stroke-width="1.6"`;
+    if (shape === 'square') return `<rect ${common} x="${x - size}" y="${y - size}" width="${size * 2}" height="${size * 2}"/>`;
+    if (shape === 'diamond') return `<rect ${common} x="${x - size}" y="${y - size}" width="${size * 2}" height="${size * 2}" transform="rotate(45 ${x} ${y})"/>`;
+    if (shape === 'triangle') return `<path ${common} d="M ${x} ${y - size - 1} L ${x + size + 1} ${y + size} L ${x - size - 1} ${y + size} Z"/>`;
+    return `<circle ${common} cx="${x}" cy="${y}" r="${size}"/>`;
+}
+function legendNode(shape, color) {
+    const c = `fill="#fff" stroke="${color}" stroke-width="1.6"`;
+    if (shape === 'square') return `<svg width="9" height="9"><rect x="0.5" y="0.5" width="8" height="8" rx="1.5" ${c}/></svg>`;
+    if (shape === 'diamond') return `<svg width="9" height="9"><rect x="0.5" y="0.5" width="8" height="8" rx="1.5" ${c} transform="rotate(45 4.5 4.5)"/></svg>`;
+    if (shape === 'triangle') return `<svg width="9" height="9"><path d="M4.5 0.5 L8.5 8.5 L0.5 8.5 Z" ${c}/></svg>`;
+    return `<svg width="9" height="9"><circle cx="4.5" cy="4.5" r="3.8" ${c}/></svg>`;
+}
+
+// ECharts 的 inside dataZoom 在部分浏览器里不会稳定接管触控板/滚轮事件，
+// 这里显式把图内滚动映射为纵向 dataZoom，避免用户必须拖右侧细滚动条。
+function bindVerticalHeatWheel(chart, hostId, totalRows, visibleRows) {
+    const host = document.getElementById(hostId);
+    if (!chart || !host || totalRows <= visibleRows) return;
+    let start = 0;
+    const maxStart = Math.max(0, totalRows - visibleRows);
+    host.onwheel = event => {
+        const delta = event.deltaY || event.deltaX;
+        if (!delta) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const step = Math.max(1, Math.min(4, Math.round(Math.abs(delta) / 45)));
+        const next = Math.max(0, Math.min(maxStart, start + (delta > 0 ? step : -step)));
+        if (next === start) return;
+        start = next;
+        chart.dispatchAction({
+            type: 'dataZoom', dataZoomIndex: 0,
+            startValue: start, endValue: start + visibleRows - 1,
+        });
+    };
+}
+function renderDimensionTrend(us) {
+    const dim = state.trendDim;
+    const key = state.trendDimMetric;
+    const selectedLectures = appliedLectureSelection();
+    const selectionSuffix = lectureSelectionSuffix(selectedLectures);
+    const dimCfg = TREND_DIMS.find(d => d.key === dim) || TREND_DIMS[0];
+    const isPeopleDim = dim === 'groupLeader' || dim === 'teacherName';
+    const isDiff = key === 'diff';
+    const buckets = {};
+    us.forEach(u => {
+        const name = HXD.dimValue(u, dim);
+        (buckets[name] || (buckets[name] = [])).push(u);
+    });
+    const lectures = Array.from({ length: HXD.LECTURE_COUNT }, (_, i) => i + 1);
+    const valuesByName = Object.fromEntries(Object.keys(buckets).map(name => [name, lectures.map(n => {
+        const a = HXD.agg(buckets[name], { lectures: new Set([n]) });
+        const v = M[key].num(a);
+        return v == null ? null : +v.toFixed(1);
+    })]));
+    const meanValue = name => {
+        const vals = valuesByName[name].filter(v => v != null && isFinite(v));
+        return vals.length ? vals.reduce((sum, v) => sum + v, 0) / vals.length : Infinity;
+    };
+    let allNames = Object.keys(buckets);
+    if (dim === 'grade') {
+        allNames.sort((a, b) => {
+            const ai = GRADE_ORDER.indexOf(a), bi = GRADE_ORDER.indexOf(b);
+            return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
+        });
+    } else if (dim === 'isNewDim') {
+        const order = ['新生', '老生'];
+        allNames.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    } else if (isPeopleDim) {
+        allNames.sort((a, b) => meanValue(a) - meanValue(b));
+    } else {
+        allNames.sort((a, b) => buckets[b].length - buckets[a].length);
+    }
+    // 所有拆分维度均展示完整成员：学科负责人约 9 人可直接用折线展示；
+    // 组长/辅导则由热力矩阵和纵向缩放承担高基数浏览，不裁剪数据。
+    const names = allNames;
+
+    // 组长/辅导人数多时，多折线会遮挡。改用「讲次 × 人员」热力矩阵，
+    // 默认按所选指标均值从低到高排列，并通过纵向缩放浏览完整人员列表。
+    if (isPeopleDim) {
+        const heatData = [];
+        names.forEach((name, yi) => valuesByName[name].forEach((v, xi) => {
+            if (v != null && isFinite(v)) heatData.push([xi, yi, v]);
+        }));
+        const vals = heatData.map(d => d[2]);
+        let min = 0, max = 100;
+        if (vals.length) {
+            if (isDiff) {
+                const bound = Math.max(1, Math.ceil(Math.max(...vals.map(v => Math.abs(v)))));
+                min = -bound;
+                max = bound;
+            } else {
+                min = Math.max(0, Math.floor(Math.min(...vals) - 2));
+                max = Math.min(100, Math.ceil(Math.max(...vals) + 2));
+                if (max - min < 8) {
+                    const mid = (min + max) / 2;
+                    min = Math.max(0, Math.floor(mid - 4));
+                    max = Math.min(100, Math.ceil(mid + 4));
+                }
+            }
+        }
+        const visibleRows = Math.min(10, names.length);
+        document.getElementById('trend-hint').textContent = `问题：${M[key].name}按${dimCfg.name}的逐讲变化如何？ · 点热力格看对象，点讲次看全量${selectionSuffix}`;
+        const chart = HXUI.chart('hx-dim-trend', {
+            animation: false,
+            grid: { left: 78, right: names.length > visibleRows ? 34 : 18, top: 34, bottom: 46 },
+            tooltip: {
+                position: 'top',
+                formatter: p => {
+                    const d = p.value || p.data || [];
+                    const lecture = lectures[d[0]];
+                    return `<b>${names[d[1]]}</b><br/>第${lecture}讲 · ${M[key].name}：<b>${fmtM(key, d[2])}</b><br/><span style="color:#2f5fac">点击查看该对象 · 该讲详情</span>`;
+                },
+            },
+            visualMap: {
+                min, max, calculable: false, orient: 'horizontal', top: 2, right: names.length > visibleRows ? 28 : 12,
+                itemWidth: 7, itemHeight: 64, text: ['高', '低'], textGap: 5,
+                textStyle: { fontSize: 9, color: '#94a3bd' },
+                inRange: { color: isDiff
+                    ? ['#2f6fed', '#dbeafe', '#f4f6fa', '#fde1bc', '#d96b43']
+                    : ['#f29a7e', '#f8d6b5', '#eef2f8', '#8bd3ce', '#2f6fed'] },
+            },
+            xAxis: {
+                type: 'category', data: lectures, triggerEvent: true,
+                axisLabel: {
+                    fontSize: 9, color: '#94a3bd', interval: 0,
+                    formatter: v => {
+                        const lecture = +v;
+                        return selectedLectures.has(lecture) ? `{selected|第${v}讲}` : `第${v}讲`;
+                    },
+                    rich: {
+                        selected: { color: '#d96b43', fontWeight: 700 },
+                    },
+                },
+                axisTick: { show: false }, axisLine: { lineStyle: { color: '#c3cfe3' } },
+            },
+            yAxis: {
+                type: 'category', data: names, inverse: true,
+                axisLabel: { fontSize: 10, color: '#60708d', width: 62, overflow: 'truncate' },
+                axisTick: { show: false }, axisLine: { show: false },
+            },
+            dataZoom: names.length > visibleRows ? [
+                {
+                    type: 'inside', yAxisIndex: 0, startValue: 0, endValue: visibleRows - 1, zoomLock: true,
+                    moveOnMouseWheel: true, zoomOnMouseWheel: false, moveOnMouseMove: true,
+                },
+                { type: 'slider', yAxisIndex: 0, right: 4, width: 8, startValue: 0, endValue: visibleRows - 1, showDetail: false, brushSelect: false },
+            ] : [],
+            series: [{
+                type: 'heatmap',
+                data: heatData.map(d => {
+                    const lecture = lectures[d[0]];
+                    if (selectedLectures.has(lecture)) return { value: d, itemStyle: { borderColor: '#d97706', borderWidth: 2.5, borderRadius: 2 } };
+                    return d;
+                }),
+                itemStyle: { borderColor: '#fff', borderWidth: 2, borderRadius: 2 },
+                emphasis: { itemStyle: { borderColor: '#163563', borderWidth: 1, shadowBlur: 5, shadowColor: 'rgba(22,53,99,.18)' } },
+            }],
+        });
+        chart.on('click', params => {
+            if (params.componentType === 'xAxis') {
+                const lecture = +params.value;
+                openScopeDrawer({ name: `第${lecture}讲`, path: [`第${lecture}讲`], units: us, children: [] }, key, {
+                    opt: { lectures: new Set([lecture]) }, source: `维度趋势 · 按${dimCfg.name}`, peerUnits: comparisonUnits(),
+                });
+                return;
+            }
+            if (params.seriesType !== 'heatmap') return;
+            const d = params.value || [];
+            const lecture = lectures[d[0]], name = names[d[1]];
+            openScopeDrawer({ name, path: [name, `第${lecture}讲`], units: buckets[name], children: [] }, key, {
+                opt: { lectures: new Set([lecture]) }, source: `维度趋势 · 按${dimCfg.name}`, peerUnits: comparisonUnits(),
+            });
+        });
+        bindVerticalHeatWheel(chart, 'hx-dim-trend', names.length, visibleRows);
+        const dimSel = document.getElementById('trend-dim-select');
+        const metricSel = document.getElementById('trend-metric-select');
+        dimSel.onchange = e => { state.trendDim = e.target.value; render(); };
+        metricSel.onchange = e => { state.trendDimMetric = e.target.value; render(); };
+        return;
+    }
+
+    const newOldColors = { 新生: '#2f6fed', 老生: '#f59e0b' };
+    const series = names.map((name, i) => ({
+        name,
+        type: 'line',
+        smooth: false,
+        symbol: 'circle',
+        symbolSize: 7,
+        lineStyle: { width: 2, color: dim === 'isNewDim' ? newOldColors[name] : SERIES_COLORS[i % SERIES_COLORS.length] },
+        itemStyle: { color: dim === 'isNewDim' ? newOldColors[name] : SERIES_COLORS[i % SERIES_COLORS.length] },
+        data: valuesByName[name],
+    }));
+    if (series.length && selectedLectures.size) {
+        const marks = [];
+        [...selectedLectures].sort((a, b) => a - b).forEach(n => marks.push({
+            xAxis: n,
+            lineStyle: { color: 'rgba(245,158,11,.16)', width: 22, type: 'solid' },
+            label: { show: false },
+        }));
+        series[0].markLine = {
+            silent: true,
+            symbol: ['none', 'none'],
+            z: 0,
+            data: marks,
+        };
+    }
+    const vals = series.flatMap(s => s.data).filter(v => v != null && isFinite(v));
+    let min = 0, max = 100;
+    if (isDiff && vals.length) {
+        const lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+        const pad = Math.max(1, (hi - lo) * .16);
+        min = Math.floor(lo - pad);
+        max = Math.ceil(hi + pad);
+    }
+    document.getElementById('trend-hint').textContent = `问题：${M[key].name}按${dimCfg.name}的逐讲变化如何？ · 点折线点看对象，点讲次看全量${selectionSuffix}`;
+    const chart = HXUI.chart('hx-dim-trend', {
+        color: SERIES_COLORS,
+        grid: { left: 42, right: 18, top: 48, bottom: 42 },
+        tooltip: {
+            trigger: 'axis',
+            formatter: ps => {
+                const n = ps && ps.length ? ps[0].axisValue : '';
+                return `<b>第${n}讲 · ${M[key].name}</b><br/>` + (ps || []).map(p => `${p.marker}${p.seriesName}：<b>${fmtM(key, p.value)}</b>`).join('<br/>') + '<br/><span style="color:#2f5fac">点击折线点查看该对象详情</span>';
+            },
+        },
+        legend: { type: 'scroll', top: 4, left: 8, right: 8, itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 10, color: '#60708d' } },
+        xAxis: {
+            type: 'category',
+            boundaryGap: false,
+            data: lectures,
+            triggerEvent: true,
+            axisLabel: {
+                fontSize: 9, color: '#94a3bd', interval: 0,
+                formatter: v => {
+                    const lecture = +v;
+                    return selectedLectures.has(lecture) ? `{selected|第${v}讲}` : `第${v}讲`;
+                },
+                rich: {
+                    selected: { color: '#d96b43', fontWeight: 700 },
+                },
+            },
+            splitArea: {
+                show: !!selectedLectures.size,
+                areaStyle: { color: lectures.map(n => selectedLectures.has(n) ? 'rgba(245,158,11,.13)' : 'rgba(255,255,255,0)') },
+            },
+            axisTick: { show: false },
+            axisLine: { lineStyle: { color: '#c3cfe3' } },
+        },
+        yAxis: {
+            type: 'value', min, max,
+            axisLabel: { fontSize: 10, color: '#94a3bd', formatter: v => v + (isDiff ? 'pp' : '%') },
+            splitLine: { lineStyle: { color: '#eef2f8' } },
+        },
+        series,
+    });
+    chart.on('click', params => {
+        const lecture = +(params.componentType === 'xAxis' ? params.value : params.name);
+        if (!lecture) return;
+        if (params.componentType === 'series') {
+            const name = params.seriesName;
+            openScopeDrawer({ name, path: [name, `第${lecture}讲`], units: buckets[name], children: [] }, key, {
+                opt: { lectures: new Set([lecture]) }, source: `维度趋势 · 按${dimCfg.name}`, peerUnits: comparisonUnits(),
+            });
+        } else if (params.componentType === 'xAxis') {
+            openScopeDrawer({ name: `第${lecture}讲`, path: [`第${lecture}讲`], units: us, children: [] }, key, {
+                opt: { lectures: new Set([lecture]) }, source: `维度趋势 · 按${dimCfg.name}`, peerUnits: comparisonUnits(),
+            });
+        }
+    });
+    const dimSel = document.getElementById('trend-dim-select');
+    const metricSel = document.getElementById('trend-metric-select');
+    dimSel.onchange = e => { state.trendDim = e.target.value; render(); };
+    metricSel.onchange = e => { state.trendDimMetric = e.target.value; render(); };
+}
+function renderTrend(us) {
+    const dimMode = state.trendMode === 'dimension';
+    document.querySelectorAll('#trend-mode button').forEach(b => {
+        b.classList.toggle('active', b.dataset.mode === state.trendMode);
+        b.onclick = () => {
+            state.trendMode = b.dataset.mode;
+            state.focusLecture = null;
+            render();
+        };
+    });
+    document.getElementById('trend-overall-controls').classList.toggle('hidden', dimMode);
+    document.getElementById('trend-dim-controls').classList.toggle('hidden', !dimMode);
+    document.getElementById('trend-dim-controls').classList.toggle('flex', dimMode);
+    document.getElementById('hx-legend').classList.toggle('hidden', dimMode);
+    document.getElementById('hx-trend').classList.toggle('hidden', dimMode);
+    document.getElementById('hx-dim-trend').classList.toggle('hidden', !dimMode);
+    if (dimMode) {
+        renderDimensionTrend(us);
+        return;
+    }
+    const sel = appliedLectureSelection();
+    const selectionSuffix = lectureSelectionSuffix(sel);
+    // ---- legend ----
+    const legend = document.getElementById('hx-legend');
+    const groupHtml = (gKey, tagColor, tagBg) => `<div class="hx-legend-group">
+        <span class="hx-legend-tag" style="color:${tagColor};background:${tagBg}">${DOMAINS[gKey].tag} · ${gKey === 'attendance' ? '实线' : '虚线'}</span>
+        ${DOMAINS[gKey].keys.map(k => `<button class="hx-legend-btn ${state.visibleMetrics.has(k) ? '' : 'off'}" data-legend="${k}">${legendNode(SHAPES[k], M[k].color)}${M[k].name}</button>`).join('')}
+    </div>`;
+    legend.innerHTML = groupHtml('attendance', '#2f6fed', '#e8f0fe') + groupHtml('practice', '#c05636', '#fdf0ea');
+    legend.querySelectorAll('[data-legend]').forEach(b => {
+        b.onclick = () => {
+            const k = b.dataset.legend;
+            if (state.visibleMetrics.has(k)) {
+                if (state.visibleMetrics.size === 1) return HXUI.toast('至少保留一个指标');
+                state.visibleMetrics.delete(k);
+            } else state.visibleMetrics.add(k);
+            state.focusedMetric = state.visibleMetrics.size === 1 ? [...state.visibleMetrics][0] : null;
+            render();
+        };
+    });
+    // seg active 态
+    const cur = [...state.visibleMetrics].sort().join('|');
+    const sets = {
+        all: ALL_KEYS.slice().sort().join('|'),
+        attendance: DOMAINS.attendance.keys.slice().sort().join('|'),
+        practice: DOMAINS.practice.keys.slice().sort().join('|'),
+    };
+    document.querySelectorAll('#trend-seg button').forEach(b => {
+        b.classList.toggle('active', sets[b.dataset.seg] === cur);
+        b.onclick = () => {
+            state.visibleMetrics = new Set(b.dataset.seg === 'all' ? ALL_KEYS : DOMAINS[b.dataset.seg].keys);
+            state.focusedMetric = null;
+            render();
+        };
+    });
+    const activeTrendMetric = state.focusedMetric || state.ov.key;
+    document.getElementById('trend-hint').textContent = (state.focusedMetric
+        ? `问题：${M[state.focusedMetric].name}在哪些讲次需要重点关注？`
+        : (state.visibleMetrics.size === ALL_KEYS.length ? `全部 ${ALL_KEYS.length} 项指标` : `当前显示 ${state.visibleMetrics.size} 项指标`)) + selectionSuffix;
+    document.getElementById('hx-clear-focus').classList.toggle('hidden', !state.focusLecture);
+    document.getElementById('hx-clear-focus').onclick = () => { state.focusLecture = null; render(); HXUI.toast('已返回筛选口径'); };
+
+    // ---- svg ----
+    const svg = document.getElementById('hx-trend');
+    const W = 1200, H = 280, left = 40, right = 22, top = 10, bottom = 28;
+    const w = W - left - right, h = H - top - bottom;
+    const LECN = HXD.LECTURE_COUNT;
+    const x = i => left + i * w / (LECN - 1);
+    const y = v => top + (100 - v) / 100 * h;
+    let html = '';
+    // 已选讲次带
+    const bandW = Math.min(w / (LECN - 1), 58);
+    if (sel.size && state.applied.year === '26' && state.applied.season === 'autumn') {
+        [...sel].sort((p, q) => p - q).forEach(n => {
+            const bx = Math.max(left, Math.min(W - right - bandW, x(n - 1) - bandW / 2));
+            html += `<rect class="hx-selection-band" x="${bx.toFixed(1)}" y="${top}" width="${bandW.toFixed(1)}" height="${h}" rx="3"/>`;
+            if (sel.size <= 6) html += `<text class="hx-axis-text selected" x="${(bx + bandW / 2).toFixed(1)}" y="${top + 11}" text-anchor="middle">已选</text>`;
+        });
+    }
+    if (state.focusLecture) {
+        const bx = Math.max(left, Math.min(W - right - bandW, x(state.focusLecture - 1) - bandW / 2));
+        html += `<rect class="hx-focus-band" x="${bx.toFixed(1)}" y="${top}" width="${bandW.toFixed(1)}" height="${h}" rx="3"/>`;
+    }
+    // 网格
+    [0, 20, 40, 60, 80, 100].forEach(v => {
+        html += `<line class="hx-grid-line" x1="${left}" y1="${y(v).toFixed(1)}" x2="${W - right}" y2="${y(v).toFixed(1)}"/>
+            <text class="hx-axis-text" x="6" y="${(y(v) + 3).toFixed(1)}">${v}</text>`;
+    });
+    html += `<line class="hx-axis-line" x1="${left}" y1="${y(0)}" x2="${W - right}" y2="${y(0)}"/>`;
+    // 数据线（逐讲 agg 一次算全部指标）
+    const riskLectures = trendRiskLectures(us, activeTrendMetric);
+    if (us.length) {
+        const perLec = Array.from({ length: LECN }, (_, i) => HXD.agg(us, { lectures: new Set([i + 1]) }));
+        ALL_KEYS.filter(k => state.visibleMetrics.has(k)).forEach(k => {
+            const vals = perLec.map(a => M[k].num(a));
+            const pts = vals.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(Math.max(-5, Math.min(100, v || 0))).toFixed(1)).join(' ');
+            html += `<path class="hx-series ${M[k] === M.diff || DOMAINS.practice.keys.includes(k) ? 'practice' : ''} ${state.focusedMetric === k ? 'focused' : ''}" d="${pts}" stroke="${M[k].color}"/>`;
+            vals.forEach((v, i) => { if (v != null) html += pointSvg(SHAPES[k], x(i), y(v), M[k].color, i + 1, k); });
+        });
+    }
+    // x 轴标签 + 命中区
+    for (let i = 0; i < LECN; i++) {
+        if (riskLectures.has(i + 1)) {
+            const label = `${M[activeTrendMetric].name}｜需关注`;
+            const badgeW = Math.min(112, Math.max(72, label.length * 11));
+            html += `<rect x="${(x(i)-badgeW/2).toFixed(1)}" y="${top+3}" width="${badgeW}" height="16" rx="8" fill="#fff0eb" stroke="#f97316"/>
+                <text x="${x(i).toFixed(1)}" y="${top+14}" text-anchor="middle" font-size="8.5" font-weight="700" fill="#c2411c">${label}</text>`;
+        }
+        if ([0, 2, 5, 8, 11, 14].includes(i) || sel.has(i + 1)) {
+            html += `<text class="hx-axis-text${sel.has(i + 1) ? ' selected' : ''}" x="${x(i).toFixed(1)}" y="${H - 7}" text-anchor="middle">第${i + 1}讲</text>`;
+        }
+        html += `<rect class="hx-chart-hit" data-lecture="${i + 1}" x="${(x(i) - w / LECN / 2).toFixed(1)}" y="${top}" width="${(w / LECN).toFixed(1)}" height="${h}"/>`;
+    }
+    svg.innerHTML = html;
+
+    // hover tooltip + 点击聚焦
+    const tip = hxTip();
+    svg.querySelectorAll('.hx-chart-hit,.hx-chart-point').forEach(el => {
+        const n = +el.dataset.lecture;
+        el.onmousemove = e => {
+            if (!us.length) return;
+            const a = HXD.agg(us, { lectures: new Set([n]) });
+            const rows = ALL_KEYS.filter(k => state.visibleMetrics.has(k))
+                .map(k => `<div class="tr"><em>${M[k].name}</em><strong>${fmtM(k, M[k].num(a))}</strong></div>`).join('');
+            hxShowTip(e, `<b>第${n}讲 · 汇总</b>${rows}`);
+        };
+        el.onmouseleave = () => tip.style.display = 'none';
+        el.onclick = () => {
+            const key = el.dataset.metric || activeTrendMetric;
+            openScopeDrawer({ name: `第${n}讲`, path: [`第${n}讲`], units: us, children: [] }, key, {
+                opt: { lectures: new Set([n]) }, source: '逐讲趋势', peerUnits: comparisonUnits(),
+            });
+        };
+    });
+}
+
+// ================= ② 基地数据概览 =================
+function ovGroup(units, fields) {
+    function build(list, depth, path) {
+        if (depth >= fields.length) return [];
+        const map = {};
+        list.forEach(u => { const v = HXD.dimValue(u, fields[depth]); (map[v] || (map[v] = [])).push(u); });
+        return Object.keys(map).map(name => {
+            const p = path.concat(name);
+            return { name, path: p, units: map[name], children: build(map[name], depth + 1, p), parentId: path.join('/') };
+        });
+    }
+    return build(units, 0, []);
+}
+function ovLeaves(nodes) {
+    const out = [];
+    (function walk(list) { list.forEach(n => { if (n.children.length) walk(n.children); else out.push(n); }); })(nodes);
+    return out;
+}
+function ovSignals(nodes, opt, key) {
+    const aggs = nodes.map(n => HXD.agg(n.units, opt));
+    const vals = aggs.map(a => M[key].num(a)).filter(v => v != null);
+    return nodes.map((n, i) => {
+        const v = M[key].num(aggs[i]);
+        const rl = HXD.rankLevel(vals, v, M[key].better);
+        return { node: n, value: v, sample: aggs[i].unitCount, rank: rl.rank, count: rl.count, level: rl.level, label: rl.label };
+    });
+}
+function ovTipHtml(s, key) {
+    return `<b>${s.node.name}</b>
+        <div class="tr"><em>${M[key].name}</em><strong>${fmtM(key, s.value)}</strong></div>
+        <div class="tr"><em>同级位置</em><strong>${s.rank ? s.rank + '/' + s.count : '暂无可比'}</strong></div>`;
+}
+function vBarsHtml(signals, key, drill) {
+    const vals = signals.map(s => s.value).filter(v => v != null);
+    const maxV = Math.max(1, ...vals.map(Math.abs));
+    const bars = signals.map((s, i) => {
+        const hv = s.value == null ? 0 : (key === 'diff' ? Math.max(3, Math.abs(s.value) / maxV * 100) : Math.max(3, Math.min(100, s.value)));
+        const tip = esc(ovTipHtml(s, key));
+        const dr = esc(JSON.stringify({ card: drill.card, path: s.node.path }));
+        return `<div class="hx-vbar" style="--mc:${BASE_COLORS[i % BASE_COLORS.length]};height:${hv.toFixed(1)}%" data-ov-tip="${tip}" data-ov-drill="${dr}">
+            <b>${fmtM(key, s.value)}</b><span>${s.node.name}</span></div>`;
+    }).join('');
+    return `<div class="hx-vbars"><div class="hx-vcluster">
+            <div class="hx-vbars-inner">${bars}</div>
+        </div></div>
+        <div class="hx-vlegend">${ORG.bases.map((b, i) => `<span><i style="background:${BASE_COLORS[i]}"></i>${b}</span>`).join('')}</div>`;
+}
+function rankBarsHtml(signals, key, drill, subFn) {
+    if (!signals.length) return '<div class="hx-empty">当前筛选范围暂无数据</div>';
+    subFn = subFn || (s => s.node.path.slice(0, -1).join(' / ') || '—');
+    const showOwned = HX_ROLE.hasProfile() && HX_ROLE.getScope('core') === 'all';
+    const max = Math.max(1, ...signals.map(s => Math.abs(s.value || 0)));
+    return `<div>${signals.map(s => {
+        const width = s.value == null ? 0 : (key === 'diff' ? Math.abs(s.value) / max * 100 : Math.max(2, Math.min(100, s.value)));
+        const tip = esc(ovTipHtml(s, key));
+        const dr = esc(JSON.stringify({ card: drill.card, path: s.node.path }));
+        return `<div class="hx-rank-row" data-ov-tip="${tip}" data-ov-drill="${dr}">
+            <div class="hx-rank-label"><b>${s.node.name}${showOwned && HX_ROLE.isOwned(s.node.units) ? '<em class="hx-owned-badge">我的</em>' : ''}</b><small>${subFn(s)}</small></div>
+            <div class="hx-rank-track"><div class="hx-rank-fill" style="width:${width.toFixed(1)}%;--mc:${M[key].color}"></div></div>
+            <div class="hx-rank-value">${fmtM(key, s.value)}</div>
+        </div>`;
+    }).join('')}</div>`;
+}
+function heatRowsHtml(signals, key, groupDepth, drill) {
+    if (!signals.length) return '<div class="hx-empty">当前筛选范围暂无数据</div>';
+    const max = Math.max(1, ...signals.map(s => Math.abs(s.value || 0)));
+    return signals.map(s => {
+        const width = s.value == null ? 0 : (key === 'diff' ? Math.abs(s.value) / max * 100 : Math.max(3, Math.min(100, s.value)));
+        const tip = esc(ovTipHtml(s, key));
+        const dr = esc(JSON.stringify({ card: drill.card, path: s.node.path }));
+        return `<div class="hx-heat-row" data-ov-tip="${tip}" data-ov-drill="${dr}">
+            <div class="hx-heat-path">${s.node.path.slice(groupDepth).join(' / ')}</div>
+            <div class="hx-heat-bar" style="--heat:${LEVEL_COLORS[s.level]};--width:${width.toFixed(1)}%;--mc:${M[key].color}">
+                <span>${s.label}${s.rank ? ' · ' + s.rank + '/' + s.count : ''}</span>
+            </div>
+            <div class="hx-heat-value">${fmtM(key, s.value)}</div>
+        </div>`;
+    }).join('');
+}
+function foldsHtml(nodes, foldDepth, key, card, inner) {
+    const groups = {};
+    nodes.forEach(n => {
+        const g = n.path.slice(0, foldDepth).join('/');
+        (groups[g] || (groups[g] = [])).push(n);
+    });
+    const keys = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+    if (!keys.length) return '<div class="hx-empty">当前筛选范围暂无数据</div>';
+    return keys.map(g => `<details open class="hx-fold">
+        <summary>${g.split('/').join(' / ')}</summary>
+        ${inner(ovSignals(groups[g], aggOpt(), key), g)}
+    </details>`).join('');
+}
+function presetNames(units, dim) {
+    const found = [...new Set(units.map(u => HXD.dimValue(u, dim)).filter(Boolean))];
+    const orders = { base: ORG.bases, subject: ORG.subjects, grade: ORG.grades };
+    const order = orders[dim];
+    if (!order) return found.sort((a, b) => a.localeCompare(b, 'zh-CN'));
+    return found.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+}
+function presetCellUnits(units, filters) {
+    return units.filter(u => Object.entries(filters).every(([dim, value]) => HXD.dimValue(u, dim) === value));
+}
+function metricAttentionThreshold(key) {
+    const value = METRIC_ATTENTION_THRESHOLDS[key];
+    return typeof value === 'number' && isFinite(value) ? value : null;
+}
+function metricFailsThreshold(value, key, threshold) {
+    return M[key].better === 'lower' ? value > threshold : value < threshold;
+}
+function thresholdRuleText(key, threshold) {
+    return `业务阈值 ${M[key].better === 'lower' ? '≤' : '≥'} ${fmtM(key, threshold)}`;
+}
+function attentionPalette(percentile) {
+    if (percentile <= .25) return '#f9d7dc';
+    if (percentile <= .5) return '#ffebbd';
+    if (percentile <= .75) return '#e7f0fb';
+    return '#c9efe1';
+}
+/**
+ * 为一个有业务可比性的同级池计算关注状态与颜色。
+ * item.metricValue 为指标值；结果写回 risk / attentionLabel / attentionRule / fill。
+ */
+function applyAttentionPool(items, key, fallbackRule) {
+    const valid = items.filter(item => typeof item.metricValue === 'number' && isFinite(item.metricValue));
+    items.forEach(item => Object.assign(item, { risk: false, attentionLabel: '', attentionRule: '', fill: '#edf2f7' }));
+    const threshold = metricAttentionThreshold(key);
+    if (threshold != null) {
+        const deltas = valid.map(item => M[key].better === 'lower' ? threshold - item.metricValue : item.metricValue - threshold);
+        const maxFail = Math.max(0, ...deltas.filter(d => d < 0).map(d => Math.abs(d)));
+        const maxPass = Math.max(0, ...deltas.filter(d => d >= 0));
+        valid.forEach((item, index) => {
+            const delta = deltas[index];
+            item.risk = metricFailsThreshold(item.metricValue, key, threshold);
+            item.attentionLabel = item.risk ? `${M[key].name}需关注` : '';
+            item.attentionRule = thresholdRuleText(key, threshold);
+            if (item.risk) item.fill = maxFail && Math.abs(delta) / maxFail > .5 ? '#f9d7dc' : '#ffebbd';
+            else item.fill = maxPass && delta / maxPass > .5 ? '#c9efe1' : '#e7f0fb';
+        });
+        return { mode: 'threshold', text: `判定依据：${thresholdRuleText(key, threshold)}` };
+    }
+    if (!fallbackRule) {
+        valid.forEach(item => { item.attentionRule = '当前指标暂未配置关注阈值，不判定需关注'; });
+        return { mode: 'none', text: '当前指标暂未配置关注阈值，不判定需关注' };
+    }
+    const ordered = valid.slice().sort((a, b) => M[key].better === 'lower' ? b.metricValue - a.metricValue : a.metricValue - b.metricValue);
+    const riskCount = ordered.length < 2 ? 0 : Math.max(1, Math.ceil(ordered.length * .1));
+    ordered.forEach((item, index) => {
+        const percentile = ordered.length < 2 ? 1 : index / (ordered.length - 1);
+        item.fill = attentionPalette(percentile);
+        item.risk = index < riskCount;
+        item.attentionLabel = item.risk ? '相对低位' : '';
+        item.attentionRule = fallbackRule;
+    });
+    return { mode: 'peer', text: `判定依据：${fallbackRule}` };
+}
+function attentionItemStyle(item) {
+    return {
+        color: item.fill || '#edf2f7',
+        borderColor: item.risk ? '#f97316' : '#fff',
+        borderWidth: 3,
+        borderRadius: 5,
+    };
+}
+function overviewAttentionNote(cardId, key) {
+    const threshold = metricAttentionThreshold(key);
+    if (threshold != null) return `判定依据：${thresholdRuleText(key, threshold)}${cardId === 'sgd' ? '；点击组合查看基地分布' : ''}`;
+    if (cardId === 'bs') return '横轴＝学科，颜色＝基地；未配置阈值不标关注';
+    if (cardId === 'sg') return '判定依据：同学科组长末位10%';
+    if (cardId === 'gsb') return '判定依据：同年级·学科基地末位10%';
+    if (cardId === 'sgd') return '未配置阈值，不判定需关注；点击组合查看基地分布';
+    return '';
+}
+function openPresetDrawer(cardId, path, units, key) {
+    const cfg = CARDS[cardId];
+    if (!cfg || !units.length) return;
+    const last = cfg.fields[cfg.fields.length - 1];
+    const next = ORG_NEXT[last];
+    const node = {
+        name: path[path.length - 1], path, units,
+        children: next ? ovGroup(units, [next]) : [],
+        dimName: next ? ((HXD.DIMENSIONS.find(d => d.key === next) || {}).name || next) : '',
+    };
+    openScopeDrawer(node, key, { source: CARDS[cardId].title, peerUnits: comparisonUnits() });
+}
+function renderBaseSubjectCard(us, opt, key, cardHead) {
+    const id = 'bs', el = document.getElementById('ov-' + id);
+    if (!el) return;
+    const bases = presetNames(us, 'base'), subjects = presetNames(us, 'subject');
+    const cells = bases.flatMap((base, bi) => subjects.map((subject, si) => {
+        const list = presetCellUnits(us, { base, subject });
+        const metricValue = list.length ? M[key].num(HXD.agg(list, opt)) : null;
+        return { base, subject, bi, si, list, metricValue };
+    }));
+    // 三基地数量少，柱高已经足够完成相对比较；只有正式业务阈值才标关注。
+    applyAttentionPool(cells, key, null);
+    el.innerHTML = cardHead(id) + '<div id="ov-chart-bs" style="height:330px"></div>';
+    const chart = HXUI.chart('ov-chart-bs', {
+        color: BASE_COLORS,
+        grid: { left: 42, right: 18, top: 36, bottom: 34 },
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: params => {
+            const lines = [`<b>${params[0] ? params[0].axisValue : ''}</b>`];
+            params.forEach(p => {
+                const item = p.data || {};
+                lines.push(`${p.marker}${p.seriesName}：<b>${fmtM(key, p.value)}</b>${item.attentionLabel ? ` <span style="color:#c2411c">${item.attentionLabel}</span>` : ''}`);
+            });
+            const rule = params[0] && params[0].data ? params[0].data.attentionRule : '';
+            if (rule) lines.push(`<span style="color:#8492aa">判定依据：${rule}</span>`);
+            return lines.join('<br/>');
+        } },
+        legend: { top: 0, itemWidth: 11, itemHeight: 8, textStyle: { fontSize: 10, color: '#60708d' } },
+        xAxis: { type: 'category', data: subjects, axisTick: { show: false }, axisLabel: { fontSize: 11, color: '#60708d', fontWeight: 600 } },
+        yAxis: {
+            type: 'value', max: key === 'diff' ? null : 100,
+            axisLabel: { fontSize: 10, color: '#94a3bd', formatter: '{value}' + (key === 'diff' ? 'pp' : '%') },
+            splitLine: { lineStyle: { color: '#eef2f8' } },
+        },
+        series: bases.map((base, bi) => ({
+            name: base, type: 'bar', barMaxWidth: 32,
+            itemStyle: { color: BASE_COLORS[bi % BASE_COLORS.length], borderRadius: [4, 4, 0, 0] },
+            label: { show: true, position: 'top', fontSize: 10, color: '#3d5178', formatter: p => `${fmtM(key, p.value)}${p.data && p.data.attentionLabel ? `\n${p.data.attentionLabel}` : ''}` },
+            data: subjects.map(subject => {
+                const cell = cells.find(item => item.base === base && item.subject === subject);
+                const v = cell && cell.metricValue;
+                if (v == null) return null;
+                return {
+                    value: +v.toFixed(1), attentionLabel: cell.attentionLabel, attentionRule: cell.attentionRule,
+                    itemStyle: { color: BASE_COLORS[bi % BASE_COLORS.length], borderColor: cell.risk ? '#f97316' : 'transparent', borderWidth: cell.risk ? 3 : 0, borderRadius: [4, 4, 0, 0] },
+                };
+            }),
+        })),
+    });
+    chart && chart.on('click', p => {
+        const base = p.seriesName, subject = subjects[p.dataIndex];
+        openPresetDrawer(id, [base, subject], presetCellUnits(us, { base, subject }), key);
+    });
+}
+function renderHeatPreset(cardId, us, opt, key, xDim, yDim, cardHead) {
+    const el = document.getElementById('ov-' + cardId);
+    if (!el) return;
+    const xs = presetNames(us, xDim), ys = presetNames(us, yDim);
+    const cells = [];
+    ys.forEach((yv, yi) => xs.forEach((xv, xi) => {
+        const list = presetCellUnits(us, { [xDim]: xv, [yDim]: yv });
+        const metricValue = list.length ? M[key].num(HXD.agg(list, opt)) : null;
+        cells.push({ value: [xi, yi, metricValue == null ? '-' : +metricValue.toFixed(1)], metricValue, list, xv, yv });
+    }));
+    if (metricAttentionThreshold(key) != null) applyAttentionPool(cells, key, null);
+    else if (cardId === 'sgd') applyAttentionPool(cells, key, null);
+    else if (cardId === 'sg') {
+        xs.forEach(subject => applyAttentionPool(cells.filter(cell => cell.xv === subject), key, '同学科组长末位10%'));
+    } else applyAttentionPool(cells, key, '当前图表同级对象末位10%');
+    // 管理者的学科×组长卡与负责人排名并排时，首屏展示 6 行并保留滚轮/滑杆浏览全量。
+    const rowLimit = cardId === 'sg' && HX_ROLE.current === 'manager' ? 6 : 10;
+    const visibleRows = Math.min(rowLimit, ys.length);
+    const needsScroll = ys.length > visibleRows;
+    const height = Math.max(240, 92 + visibleRows * 30);
+    el.innerHTML = cardHead(cardId) + `<div id="ov-chart-${cardId}" style="height:${height}px"></div>`;
+    const chart = HXUI.chart('ov-chart-' + cardId, {
+        grid: { left: ys.length > 8 ? 92 : 72, right: needsScroll ? 42 : 16, top: 12, bottom: 38 },
+        tooltip: {
+            position: 'top',
+            formatter: p => {
+                const cell = cells[p.dataIndex];
+                return `${ys[p.value[1]]} × ${xs[p.value[0]]}<br/><b>${M[key].name}：${fmtM(key, p.value[2])}</b>${cell && cell.attentionLabel ? `<br/><span style="color:#c2411c">${cell.attentionLabel}</span>` : ''}${cell && cell.attentionRule ? `<br/><span style="color:#8492aa">判定依据：${cell.attentionRule}</span>` : ''}`;
+            },
+        },
+        xAxis: { type: 'category', data: xs, splitArea: { show: true }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: '#60708d' } },
+        yAxis: { type: 'category', data: ys, inverse: true, splitArea: { show: true }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: '#60708d' } },
+        dataZoom: needsScroll ? [
+            {
+                type: 'inside', yAxisIndex: 0, startValue: 0, endValue: visibleRows - 1, zoomLock: true,
+                moveOnMouseWheel: true, zoomOnMouseWheel: false, moveOnMouseMove: true,
+            },
+            { type: 'slider', yAxisIndex: 0, right: 4, width: 8, startValue: 0, endValue: visibleRows - 1, showDetail: false, brushSelect: false },
+        ] : [],
+        series: [{
+            type: 'heatmap',
+            data: cells.map(c => ({ value: c.value, itemStyle: attentionItemStyle(c) })),
+            label: { show: true, fontSize: 10, color: '#163563', formatter: p => {
+                const cell = cells[p.dataIndex];
+                return `${fmtM(key, p.value[2])}${cell && cell.attentionLabel ? `\n${cell.attentionLabel}` : ''}`;
+            } },
+            emphasis: { itemStyle: { shadowBlur: 8, shadowColor: 'rgba(31,52,91,.18)' } },
+        }],
+    });
+    bindVerticalHeatWheel(chart, 'ov-chart-' + cardId, ys.length, visibleRows);
+    chart && chart.on('click', p => {
+        const cell = cells[p.dataIndex];
+        if (!cell) return;
+        const cfg = CARDS[cardId];
+        const path = cfg.fields.map(dim => dim === xDim ? cell.xv : cell.yv);
+        openPresetDrawer(cardId, path, cell.list, key);
+    });
+}
+function renderSubjectGradeCard(us, opt, key, cardHead) {
+    const id = 'sgd', el = document.getElementById('ov-' + id);
+    if (!el) return;
+    const grades = presetNames(us, 'grade').sort((a, b) => GRADE_ORDER.indexOf(a) - GRADE_ORDER.indexOf(b));
+    const subjects = presetNames(us, 'subject');
+    const cells = [];
+    subjects.forEach((subject, yi) => grades.forEach((grade, xi) => {
+        const list = presetCellUnits(us, { subject, grade });
+        const metricValue = list.length ? M[key].num(HXD.agg(list, opt)) : null;
+        cells.push({ value: [xi, yi, metricValue == null ? '-' : +metricValue.toFixed(1)], metricValue, list, grade, subject });
+    }));
+    applyAttentionPool(cells, key, null);
+
+    let selection = state.ov.sgdSelection;
+    if (selection && (!grades.includes(selection.grade) || !subjects.includes(selection.subject))) {
+        state.ov.sgdSelection = null;
+        selection = null;
+    }
+    const selectedCell = selection ? cells.find(cell => cell.grade === selection.grade && cell.subject === selection.subject && cell.list.length) : null;
+    if (selection && !selectedCell) {
+        state.ov.sgdSelection = null;
+        selection = null;
+    }
+
+    let detailHtml = `<div class="hx-sgd-detail"><div class="hx-sgd-empty">点击上方任一年级 × 学科组合，查看三个基地的当前指标分布</div></div>`;
+    let baseCells = [];
+    if (selectedCell) {
+        const bases = presetNames(selectedCell.list, 'base');
+        baseCells = bases.map(base => {
+            const list = presetCellUnits(selectedCell.list, { base });
+            const metricValue = list.length ? M[key].num(HXD.agg(list, opt)) : null;
+            return { base, list, metricValue, baseColor: BASE_COLORS[bases.indexOf(base) % BASE_COLORS.length] };
+        });
+        applyAttentionPool(baseCells, key, null);
+        baseCells.sort((a, b) => {
+            if (a.metricValue == null) return 1;
+            if (b.metricValue == null) return -1;
+            return M[key].better === 'lower' ? a.metricValue - b.metricValue : b.metricValue - a.metricValue;
+        });
+        const diffMax = Math.max(1, ...baseCells.map(cell => Math.abs(cell.metricValue || 0)));
+        detailHtml = `<div class="hx-sgd-detail">
+            <div class="hx-sgd-detail-head"><b>${selection.grade} × ${selection.subject} · 基地分布</b><button type="button" data-sgd-all>查看全部基地人员</button></div>
+            <div class="hx-sgd-base-list">${baseCells.map((cell, index) => {
+                const width = cell.metricValue == null ? 0 : (key === 'diff' ? Math.abs(cell.metricValue) / diffMax * 100 : Math.max(3, Math.min(100, cell.metricValue)));
+                return `<button type="button" class="hx-sgd-base-item ${cell.risk ? 'risk' : ''}" data-sgd-base="${encodeURIComponent(cell.base)}" style="--bc:${cell.baseColor}">
+                    <i class="hx-sgd-base-rank">${index + 1}/${baseCells.length}</i><span class="hx-sgd-base-name">${cell.base}</span><i class="hx-sgd-base-track"><i class="hx-sgd-base-fill" style="width:${width.toFixed(1)}%;--mc:${cell.risk ? '#f97316' : cell.baseColor}"></i></i>
+                    <strong>${fmtM(key, cell.metricValue)}${cell.risk ? '<small class="hx-risk-badge">需关注</small>' : ''}</strong>
+                </button>`;
+            }).join('')}</div>
+        </div>`;
+    }
+
+    el.innerHTML = cardHead(id) + `<div id="ov-chart-${id}" style="height:210px"></div>${detailHtml}`;
+    const chart = HXUI.chart('ov-chart-' + id, {
+        animation: false,
+        grid: { left: 72, right: 18, top: 12, bottom: 34 },
+        tooltip: { position: 'top', formatter: p => {
+            const cell = cells[p.dataIndex];
+            return `${cell.subject} × ${cell.grade}<br/><b>${M[key].name}：${fmtM(key, cell.metricValue)}</b>${cell.attentionLabel ? `<br/><span style="color:#c2411c">${cell.attentionLabel}</span>` : ''}${cell.attentionRule ? `<br/><span style="color:#8492aa">判定依据：${cell.attentionRule}</span>` : ''}<br/><span style="color:#2f5fac">点击查看基地分布</span>`;
+        } },
+        xAxis: { type: 'category', data: grades, splitArea: { show: true }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: '#60708d' } },
+        yAxis: { type: 'category', data: subjects, inverse: true, splitArea: { show: true }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: '#60708d' } },
+        series: [{
+            type: 'heatmap',
+            data: cells.map(cell => {
+                const selected = selection && cell.grade === selection.grade && cell.subject === selection.subject;
+                const style = attentionItemStyle(cell);
+                if (selected) Object.assign(style, { borderColor: '#165dff', borderWidth: 3, shadowBlur: 7, shadowColor: 'rgba(22,93,255,.24)' });
+                return { value: cell.value, itemStyle: style };
+            }),
+            label: { show: true, fontSize: 10, color: '#163563', formatter: p => {
+                const cell = cells[p.dataIndex];
+                return `${fmtM(key, cell.metricValue)}${cell.attentionLabel ? `\n${cell.attentionLabel}` : ''}`;
+            } },
+            emphasis: { itemStyle: { shadowBlur: 8, shadowColor: 'rgba(31,52,91,.18)' } },
+        }],
+    });
+    chart && chart.on('click', p => {
+        const cell = cells[p.dataIndex];
+        if (!cell || !cell.list.length) return;
+        state.ov.sgdSelection = { grade: cell.grade, subject: cell.subject };
+        renderBaseOverview(us, opt);
+    });
+    const allButton = el.querySelector('[data-sgd-all]');
+    if (allButton && selectedCell) allButton.onclick = () => openPresetDrawer(id, [selection.subject, selection.grade], selectedCell.list, key);
+    el.querySelectorAll('[data-sgd-base]').forEach(button => button.onclick = () => {
+        const base = decodeURIComponent(button.dataset.sgdBase);
+        const cell = baseCells.find(item => item.base === base);
+        if (cell) openPresetDrawer('gsb', [selection.grade, selection.subject, base], cell.list, key);
+    });
+}
+function renderGradeSubjectBaseCard(us, opt, key, cardHead) {
+    const id = 'gsb', el = document.getElementById('ov-' + id);
+    if (!el) return;
+    const bases = presetNames(us, 'base');
+    const grades = presetNames(us, 'grade').sort((a, b) => GRADE_ORDER.indexOf(a) - GRADE_ORDER.indexOf(b));
+    const subjects = presetNames(us, 'subject');
+    const rows = grades.flatMap(grade => subjects.map(subject => ({ grade, subject, label: `${grade} · ${subject}` })));
+    const cells = [];
+    rows.forEach((row, yi) => bases.forEach((base, xi) => {
+        const list = presetCellUnits(us, { grade: row.grade, subject: row.subject, base });
+        const metricValue = list.length ? M[key].num(HXD.agg(list, opt)) : null;
+        cells.push({ row, base, list, metricValue, value: [xi, yi, metricValue == null ? '-' : +metricValue.toFixed(1)] });
+    }));
+    if (metricAttentionThreshold(key) != null) applyAttentionPool(cells, key, null);
+    else rows.forEach(row => applyAttentionPool(cells.filter(cell => cell.row.grade === row.grade && cell.row.subject === row.subject), key, '同年级·学科基地末位10%'));
+    const visibleRows = Math.min(8, rows.length), needsScroll = rows.length > visibleRows;
+    const height = Math.max(260, 96 + visibleRows * 30);
+    el.innerHTML = cardHead(id) + `<div id="ov-chart-${id}" style="height:${height}px"></div>`;
+    const chart = HXUI.chart('ov-chart-' + id, {
+        grid: { left: 96, right: needsScroll ? 42 : 16, top: 10, bottom: 36 },
+        tooltip: { position: 'top', formatter: p => {
+            const c = cells[p.dataIndex];
+            return `${c.row.label} × ${c.base}<br/><b>${M[key].name}：${fmtM(key, c.value[2])}</b>${c.attentionLabel ? `<br/><span style="color:#c2411c">${c.attentionLabel}</span>` : ''}${c.attentionRule ? `<br/><span style="color:#8492aa">判定依据：${c.attentionRule}</span>` : ''}`;
+        } },
+        xAxis: { type: 'category', data: bases, splitArea: { show: true }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: '#60708d' } },
+        yAxis: { type: 'category', data: rows.map(r => r.label), inverse: true, splitArea: { show: true }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: '#60708d' } },
+        dataZoom: needsScroll ? [{ type: 'inside', yAxisIndex: 0, startValue: 0, endValue: visibleRows - 1, zoomLock: true, moveOnMouseWheel: true, zoomOnMouseWheel: false, moveOnMouseMove: true }, { type: 'slider', yAxisIndex: 0, right: 4, width: 8, startValue: 0, endValue: visibleRows - 1, showDetail: false, brushSelect: false }] : [],
+        series: [{ type: 'heatmap', data: cells.map(c => ({ value: c.value, itemStyle: attentionItemStyle(c) })), label: { show: true, fontSize: 10, color: '#163563', formatter: p => `${fmtM(key, p.value[2])}${cells[p.dataIndex].attentionLabel ? `\n${cells[p.dataIndex].attentionLabel}` : ''}` } }],
+    });
+    bindVerticalHeatWheel(chart, 'ov-chart-' + id, rows.length, visibleRows);
+    chart && chart.on('click', p => {
+        const c = cells[p.dataIndex];
+        if (c) openPresetDrawer(id, [c.row.grade, c.row.subject, c.base], c.list, key);
+    });
+}
+function renderSubjectGroupCard(us, opt, key, cardHead) {
+    const id = 'sg', el = document.getElementById('ov-' + id);
+    if (!el) return;
+    const subjects = presetNames(us, 'subject');
+    if (!subjects.includes(state.ov.subject)) state.ov.subject = subjects[0] || null;
+    const subject = state.ov.subject;
+    const chips = `<div class="hx-seg">${subjects.map(s => `<button data-ov-subject="${s}" class="${s === subject ? 'active' : ''}">${s}</button>`).join('')}</div>`;
+    const list = us.filter(u => u.subject === subject);
+    const sigs = ovSignals(ovGroup(list, ['groupLeader']), opt, key);
+    const lower = M[key].better === 'lower';
+    sigs.sort((a, b) => lower ? a.value - b.value : b.value - a.value);
+    const rows = sigs.slice().reverse();
+    const height = Math.max(250, 70 + rows.length * 24);
+    el.innerHTML = cardHead(id, chips) + `<div id="ov-chart-sg" style="height:${height}px"></div>`;
+    const chart = HXUI.chart('ov-chart-sg', {
+        grid: { left: 76, right: 54, top: 8, bottom: 26 },
+        tooltip: { trigger: 'item', formatter: p => `${subject} · ${p.name}<br/><b>${M[key].name}：${fmtM(key, p.value)}</b>` },
+        xAxis: {
+            type: 'value', max: key === 'diff' ? null : 100,
+            axisLabel: { fontSize: 10, color: '#94a3bd', formatter: '{value}' + (key === 'diff' ? 'pp' : '%') },
+            splitLine: { lineStyle: { color: '#eef2f8' } },
+        },
+        yAxis: { type: 'category', data: rows.map(s => s.node.name), axisTick: { show: false }, axisLabel: { fontSize: 10, color: '#60708d' } },
+        series: [{
+            type: 'bar', barMaxWidth: 15,
+            data: rows.map(s => ({ value: s.value == null ? 0 : +s.value.toFixed(1), itemStyle: { color: M[key].color, borderRadius: [0, 4, 4, 0] } })),
+            label: { show: true, position: 'right', fontSize: 10, color: '#163563', formatter: p => fmtM(key, p.value) },
+        }],
+    });
+    chart && chart.on('click', p => {
+        const row = rows[p.dataIndex];
+        if (row) openPresetDrawer(id, [subject, row.node.name], row.node.units, key);
+    });
+    el.querySelectorAll('[data-ov-subject]').forEach(b => b.onclick = () => { state.ov.subject = b.dataset.ovSubject; render(); });
+}
+function renderBaseOverview(us, opt) {
+    const ov = state.ov;
+    // 一级用分段控件切换分析域；具体指标沿用趋势图的线点图例样式，避免整排按钮感。
+    const pillBox = document.getElementById('ov-pills');
+    pillBox.innerHTML = DOMAINS[ov.domain].keys.map(k =>
+        `<button class="hx-ov-metric ${ov.key === k ? 'active' : ''}" data-ov-key="${k}" style="--mc:${M[k].color}" aria-pressed="${ov.key === k}">
+            <span class="hx-ov-metric-mark" aria-hidden="true"></span><span>${M[k].name}</span>
+        </button>`).join('');
+    pillBox.querySelectorAll('[data-ov-key]').forEach(b => b.onclick = () => {
+        const key = b.dataset.ovKey;
+        state.ov.key = key;
+        state.focusedMetric = key;
+        state.visibleMetrics = new Set([key]);
+        state.trendDimMetric = key;
+        render();
+    });
+    document.querySelectorAll('#ov-domains button').forEach(b => {
+        b.onclick = () => {
+            state.ov.domain = b.dataset.domain;
+            state.ov.key = DOMAINS[b.dataset.domain].keys[0];
+            state.focusedMetric = state.ov.key;
+            state.visibleMetrics = new Set([state.ov.key]);
+            state.trendDimMetric = state.ov.key;
+            render();
+        };
+    });
+
+    const key = ov.key;
+    const cardHead = (id, extra) => {
+        const c = CARDS[id];
+        const note = overviewAttentionNote(id, key) || c.note;
+        return `<div class="hx-ov-caption"><h3>${c.title}${note ? `<span>${note}</span>` : ''}</h3>${extra || ''}</div>`;
+    };
+    const put = (id, html) => { const el = document.getElementById('ov-' + id); if (el) el.innerHTML = html; };
+    const roleCards = ROLE_CARDS[HX_ROLE.current] || ROLE_CARDS.manager;
+
+    if (roleCards.includes('bs')) renderBaseSubjectCard(us, opt, key, cardHead);
+    if (roleCards.includes('sgd')) renderSubjectGradeCard(us, opt, key, cardHead);
+    if (roleCards.includes('sg')) renderHeatPreset('sg', us, opt, key, 'subject', 'groupLeader', cardHead);
+    if (roleCards.includes('gsb')) renderGradeSubjectBaseCard(us, opt, key, cardHead);
+    if (roleCards.includes('gg')) renderHeatPreset('gg', us, opt, key, 'grade', 'groupLeader', cardHead);
+    if (roleCards.includes('sgl')) renderHeatPreset('sgl', us, opt, key, 'subject', 'groupLeader', cardHead);
+    if (roleCards.includes('gt')) renderHeatPreset('gt', us, opt, key, 'grade', 'teacherName', cardHead);
+
+    // c1 按基地
+    if (roleCards.includes('c1')) {
+        const c1Nodes = ovGroup(us, CARDS.c1.fields);
+        put('c1', cardHead('c1') + vBarsHtml(ovSignals(c1Nodes, opt, key), key, { card: 'c1' }));
+    }
+
+    // c2 基地×年级（按基地折叠，年级横条）
+    if (roleCards.includes('c2')) {
+        const c2Nodes = ovLeaves(ovGroup(us, CARDS.c2.fields));
+        put('c2', cardHead('c2')
+            + `<div class="hx-ov-scroll">${foldsHtml(c2Nodes, 1, key, 'c2', sigs => rankBarsHtml(sigs, key, { card: 'c2' }))}</div>`);
+    }
+
+    // c3 年级×学科负责人
+    if (roleCards.includes('c3')) {
+        const c3Nodes = ovLeaves(ovGroup(us, CARDS.c3.fields));
+        put('c3', cardHead('c3')
+            + `<div class="hx-ov-scroll tall">${foldsHtml(c3Nodes, 1, key, 'c3', sigs => heatRowsHtml(sigs, key, 1, { card: 'c3' }))}</div>`);
+    }
+
+    // c4 年级×学科负责人×组长
+    if (roleCards.includes('c4')) {
+        const c4Nodes = ovLeaves(ovGroup(us, CARDS.c4.fields));
+        put('c4', cardHead('c4')
+            + `<div class="hx-ov-scroll tall">${foldsHtml(c4Nodes, 2, key, 'c4', sigs => heatRowsHtml(sigs, key, 2, { card: 'c4' }))}</div>`);
+    }
+
+    // 角色化排名卡（c5 学科负责人 / glRank 组长 / tRank 辅导 / glTeacher 组长×辅导）
+    roleCards.forEach(id => {
+        if (CARDS[id].rank) renderRankCard(id, us, opt, key, cardHead);
+        else if (id === 'glTeacher') renderGlTeacherCard(us, opt, key, cardHead);
+    });
+    bindOvEvents(document.querySelector('.hx-ov-grid'));
+}
+// 单维排名卡：按当前指标优→劣排序（c5 / glRank / tRank）
+// 类目 ≤9 用柱状图（c5 学科负责人 9 人保持柱状+斜排标签）；>9（如全部范围）切换横向条状图（容器内滚动、能力一致）
+function renderRankCard(id, us, opt, key, cardHead) {
+    const cfg = CARDS[id];
+    const el = document.getElementById('ov-' + id);
+    if (!el) return;
+    const sigs = ovSignals(ovGroup(us, cfg.fields), opt, key);
+    const lower = M[key].better === 'lower';
+    const PAD = lower ? Infinity : -Infinity;
+    sigs.sort((a, b) => {
+        const av = a.value == null ? PAD : a.value, bv = b.value == null ? PAD : b.value;
+        return lower ? av - bv : bv - av;
+    });
+    if (!sigs.length) { el.innerHTML = cardHead(id) + '<div class="hx-empty">当前筛选范围暂无数据</div>'; return; }
+    const showOwned = HX_ROLE.hasProfile() && HX_ROLE.getScope('core') === 'all';
+    const tipHtml = (s, marker) => `<b>${marker}${s.node.name}</b><br/>${M[key].name}：<b>${fmtM(key, s.value)}</b>`;
+    const drill = list => chart => chart.on('click', p => { const s = list[p.dataIndex]; if (s) openOvDrawer({ card: id, path: s.node.path }); });
+
+    if (sigs.length > 9) {
+        // 条状图（横向）：第 1 名在顶部，y 轴带排名序号，卡片内滚动看全量
+        const rev = sigs.slice().reverse();
+        const H = 46 + sigs.length * 24;
+        el.innerHTML = cardHead(id) + `<div class="hx-ov-scroll" style="max-height:360px"><div id="rk-chart-${id}" style="height:${H}px"></div></div>`;
+        const chart = HXUI.chart('rk-chart-' + id, {
+            grid: { left: 88, right: 52, top: 8, bottom: 26 },
+            tooltip: { trigger: 'item', formatter: p => { const s = rev[p.dataIndex]; return s ? tipHtml(s, p.marker) : ''; } },
+            xAxis: {
+                type: 'value', max: key === 'diff' ? null : 100,
+                axisLabel: { fontSize: 10, formatter: '{value}' + (key === 'diff' ? 'pp' : '%') },
+                splitLine: { lineStyle: { color: '#eef2f8' } },
+            },
+            yAxis: {
+                type: 'category',
+                data: rev.map((s, i) => (rev.length - i) + '.' + s.node.name),
+                axisLabel: { interval: 0, fontSize: 10, color: '#60708d' },
+                axisTick: { show: false },
+            },
+            series: [{
+                type: 'bar', barMaxWidth: 16,
+                data: rev.map(s => ({
+                    value: s.value == null ? 0 : +s.value.toFixed(1),
+                    itemStyle: { color: showOwned && HX_ROLE.isOwned(s.node.units) ? '#f0b429' : M[key].color },
+                })),
+                label: { show: true, position: 'right', fontSize: 10, color: '#163563', formatter: p => fmtM(key, (rev[p.dataIndex] || {}).value) },
+            }],
+        });
+        chart && drill(rev)(chart);
+        return;
+    }
+    const compactHeight = id === 'c5' && HX_ROLE.current === 'manager' ? 272 : 210;
+    el.innerHTML = cardHead(id) + `<div id="rk-chart-${id}" style="height:${compactHeight}px"></div>`;
+    const chart = HXUI.chart('rk-chart-' + id, {
+        grid: { left: 36, right: 10, top: 26, bottom: 42 },
+        tooltip: { trigger: 'item', formatter: p => { const s = sigs[p.dataIndex]; return s ? tipHtml(s, p.marker) : ''; } },
+        xAxis: {
+            type: 'category',
+            data: sigs.map((s, i) => (i + 1) + '.' + s.node.name),
+            axisLabel: { interval: 0, fontSize: 10, color: '#60708d', rotate: (!cfg.wide && sigs.length > 8) || sigs.length > 16 ? 30 : 0 },
+            axisTick: { show: false },
+        },
+        yAxis: {
+            type: 'value', max: key === 'diff' ? null : 100,
+            axisLabel: { fontSize: 10, formatter: '{value}' + (key === 'diff' ? 'pp' : '%') },
+            splitLine: { lineStyle: { color: '#eef2f8' } },
+        },
+        series: [{
+            type: 'bar', barMaxWidth: 30,
+            data: sigs.map(s => ({
+                value: s.value == null ? 0 : +s.value.toFixed(1),
+                itemStyle: { color: showOwned && HX_ROLE.isOwned(s.node.units) ? '#f0b429' : M[key].color },
+            })),
+            label: { show: true, position: 'top', fontSize: 10, color: '#163563', formatter: p => fmtM(key, (sigs[p.dataIndex] || {}).value) },
+        }],
+    });
+    chart && drill(sigs)(chart);
+}
+// 辅导排名卡：直接按末级辅导排名，归属组长以柱色区分（学科负责人/年级组长视角）
+// 类目 >8（我的30人/全部79人）切换横向条状图，组长分色 + 图例 + 排名序号能力不变
+function renderGlTeacherCard(us, opt, key, cardHead) {
+    const el = document.getElementById('ov-glTeacher');
+    if (!el) return;
+    const sigs = ovSignals(ovGroup(us, CARDS.glTeacher.fields), opt, key);
+    const lower = M[key].better === 'lower';
+    const PAD = lower ? Infinity : -Infinity;
+    sigs.sort((a, b) => {
+        const av = a.value == null ? PAD : a.value, bv = b.value == null ? PAD : b.value;
+        return lower ? av - bv : bv - av;
+    });
+    if (!sigs.length) { el.innerHTML = cardHead('glTeacher') + '<div class="hx-empty">当前筛选范围暂无数据</div>'; return; }
+    const u0 = s => s.node.units[0] || {};
+    const glNames = [...new Set(sigs.map(s => u0(s).groupLeader).filter(Boolean))];
+    const PALETTE = ['#165dff', '#13c2c2', '#f59e0b', '#8b5cf6', '#22c55e', '#d96b43', '#e0489a', '#0e9f9f'];
+    const showOwned = HX_ROLE.hasProfile() && HX_ROLE.getScope('core') === 'all';
+    const tipHtml = s => `<b>${s.node.name}</b>（归属：${u0(s).groupLeader || '—'}）<br/>${M[key].name}：<b>${fmtM(key, s.value)}</b>`;
+
+    if (sigs.length > 8) {
+        // 条状图（横向）：第 1 名在顶部，y 轴带排名序号，卡片内滚动看全量
+        const rev = sigs.slice().reverse();
+        const H = 64 + sigs.length * 22;
+        el.innerHTML = cardHead('glTeacher') + `<div class="hx-ov-scroll" style="max-height:360px"><div id="rk-chart-glTeacher" style="height:${H}px"></div></div>`;
+        const chart = HXUI.chart('rk-chart-glTeacher', {
+            legend: { top: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: '#60708d' }, data: glNames },
+            grid: { left: 78, right: 52, top: 30, bottom: 26 },
+            tooltip: { trigger: 'axis', formatter: ps => { const p = (ps || []).find(x => x.value != null); if (!p) return ''; const s = rev[p.dataIndex]; return s ? tipHtml(s) : ''; } },
+            xAxis: {
+                type: 'value', max: key === 'diff' ? null : 100,
+                axisLabel: { fontSize: 10, formatter: '{value}' + (key === 'diff' ? 'pp' : '%') },
+                splitLine: { lineStyle: { color: '#eef2f8' } },
+            },
+            yAxis: {
+                type: 'category',
+                data: rev.map((s, i) => (rev.length - i) + '.' + s.node.name),
+                axisLabel: { interval: 0, fontSize: 10, color: '#60708d' },
+                axisTick: { show: false },
+            },
+            series: glNames.map((gl, gi) => ({
+                name: gl, type: 'bar', barMaxWidth: 13, barGap: '-100%',
+                itemStyle: { color: PALETTE[gi % PALETTE.length] },
+                data: rev.map(s => {
+                    if (u0(s).groupLeader !== gl) return null;
+                    return {
+                        value: s.value == null ? 0 : +s.value.toFixed(1),
+                        itemStyle: { color: showOwned && HX_ROLE.isOwned(s.node.units) ? '#f0b429' : PALETTE[gi % PALETTE.length] },
+                    };
+                }),
+                label: gi === 0 ? { show: true, position: 'right', fontSize: 9, color: '#163563', formatter: p => fmtM(key, (rev[p.dataIndex] || {}).value) } : undefined,
+            })),
+        });
+        chart && chart.on('click', p => { const s = rev[p.dataIndex]; if (s) openOvDrawer({ card: 'glTeacher', path: [s.node.name] }); });
+        return;
+    }
+    el.innerHTML = cardHead('glTeacher') + `<div id="rk-chart-glTeacher" style="height:300px"></div>`;
+    const chart = HXUI.chart('rk-chart-glTeacher', {
+        legend: { top: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: '#60708d' }, data: glNames },
+        grid: { left: 36, right: 10, top: 30, bottom: 46 },
+        tooltip: { trigger: 'axis', formatter: ps => { const p = (ps || []).find(x => x.value != null); if (!p) return ''; const s = sigs[p.dataIndex]; return s ? tipHtml(s) : ''; } },
+        xAxis: {
+            type: 'category', data: sigs.map(s => s.node.name),
+            axisLabel: { interval: 0, fontSize: 10, color: '#60708d', rotate: sigs.length > 16 ? 30 : 0 },
+            axisTick: { show: false },
+        },
+        yAxis: {
+            type: 'value', max: key === 'diff' ? null : 100,
+            axisLabel: { fontSize: 10, formatter: '{value}' + (key === 'diff' ? 'pp' : '%') },
+            splitLine: { lineStyle: { color: '#eef2f8' } },
+        },
+        series: glNames.map((gl, gi) => ({
+            name: gl, type: 'bar', barMaxWidth: 22, barGap: '-100%',
+            itemStyle: { color: PALETTE[gi % PALETTE.length] },
+            data: sigs.map(s => {
+                if (u0(s).groupLeader !== gl) return null;
+                return {
+                    value: s.value == null ? 0 : +s.value.toFixed(1),
+                    itemStyle: { color: showOwned && HX_ROLE.isOwned(s.node.units) ? '#f0b429' : PALETTE[gi % PALETTE.length] },
+                };
+            }),
+            label: gi === 0 ? { show: true, position: 'top', fontSize: 9, color: '#163563', formatter: p => fmtM(key, (sigs[p.dataIndex] || {}).value) } : undefined,
+        })),
+    });
+    chart && chart.on('click', p => { const s = sigs[p.dataIndex]; if (s) openOvDrawer({ card: 'glTeacher', path: [s.node.name] }); });
+}
+// tooltip + 点击绑定
+function hxTip() {
+    let t = document.getElementById('hx-tip');
+    if (!t) { t = document.createElement('div'); t.id = 'hx-tip'; document.body.appendChild(t); }
+    return t;
+}
+function hxShowTip(e, html) {
+    const t = hxTip();
+    t.innerHTML = html;
+    t.style.display = 'block';
+    t.style.left = Math.min(e.clientX + 14, innerWidth - 240) + 'px';
+    t.style.top = Math.min(e.clientY + 14, innerHeight - 170) + 'px';
+}
+function bindOvEvents(root) {
+    const tip = hxTip();
+    root.querySelectorAll('[data-ov-tip]').forEach(el => {
+        el.onmousemove = e => hxShowTip(e, decodeURIComponent(el.dataset.ovTip));
+        el.onmouseleave = () => tip.style.display = 'none';
+    });
+    root.querySelectorAll('[data-ov-drill]').forEach(el => {
+        el.onclick = () => openOvDrawer(JSON.parse(decodeURIComponent(el.dataset.ovDrill)));
+    });
+}
+function openOvDrawer(spec) {
+    const cfg = CARDS[spec.card];
+    if (!cfg) return;
+    const us = scopedUnits();
+    const nodes = ovGroup(us, cfg.fields);
+    const target = spec.path.join('/');
+    let node = null;
+    (function walk(list) {   // 递归查找：多维卡的点击目标是叶子/中间节点，顶层 find 匹配不到
+        list.forEach(n => {
+            if (node) return;
+            if (n.path.join('/') === target) { node = n; return; }
+            if (n.children.length) walk(n.children);
+        });
+    })(nodes);
+    if (!node) return;
+    const next = ORG_NEXT[cfg.fields[cfg.fields.length - 1]];
+    if (next) {
+        node.children = ovGroup(node.units, [next]);
+        const dn = HXD.DIMENSIONS.find(x => x.key === next);
+        node.dimName = dn ? dn.name : next;
+    }
+    openScopeDrawer(node, state.ov.key);
+}
+
+// ================= 抽屉：范围详情 → 人员逐讲详情 =================
+let detailDrawerSeq = 0;
+function personKey(unit, kind) { return kind === 'group' ? unit.groupLeader : (unit.teacherId || unit.teacherName); }
+function personName(unit, kind) { return kind === 'group' ? unit.groupLeader : unit.teacherName; }
+function personCompareContext(unit, kind) {
+    const subject = unit.subject || '未分配学科';
+    if (kind === 'group') return { key: `subject:${subject}`, label: `${subject}组长`, subject, grade: null };
+    const grade = unit.grade || '未分配年级';
+    return { key: `grade-subject:${grade}|${subject}`, label: `${grade}·${subject}辅导`, subject, grade };
+}
+function personEntryId(unit, kind) {
+    const id = personKey(unit, kind);
+    return `${String(id)}@@${personCompareContext(unit, kind).key}`;
+}
+function personRowsSummary(rows) {
+    const riskRows = rows.filter(r => r.risk);
+    return {
+        people: new Set(rows.map(r => String(r.id))).size,
+        contexts: rows.length,
+        riskPeople: new Set(riskRows.map(r => String(r.id))).size,
+        riskContexts: riskRows.length,
+    };
+}
+function riskSummaryText(summary) {
+    return `${summary.riskPeople}人 / ${summary.riskContexts}个范围`;
+}
+function personOrgPath(row, kind) {
+    const u = row && row.units && row.units[0];
+    if (!u) return '组织架构暂无';
+    const parts = kind === 'group'
+        ? [u.base, u.subjectLeader, u.gradeLeader]
+        : [u.base, u.subjectLeader, u.gradeLeader, u.groupLeader];
+    return parts.filter(Boolean).join('-') || '组织架构暂无';
+}
+function drawerMetricCardsHtml(agg, key) {
+    return `<div class="hx-drawer-metrics">${ALL_KEYS.map(k => `<button type="button" class="hx-drawer-metric-card ${k === key ? 'active' : ''}" data-drawer-metric="${k}" style="--mc:${M[k].color}" title="${M[k].formula}">
+        ${k === key ? '<span class="hx-drawer-metric-current">当前关注</span>' : ''}
+        <span class="hx-drawer-metric-name"><i></i>${M[k].name}</span>
+        <strong class="hx-drawer-metric-value">${fmtM(k, M[k].num(agg))}</strong>
+    </button>`).join('')}</div>`;
+}
+function packPersonRows(units, kind, key, opt) {
+    const map = new Map();
+    units.forEach(u => {
+        const id = personKey(u, kind); if (!id) return;
+        const context = personCompareContext(u, kind);
+        const entryId = personEntryId(u, kind);
+        const item = map.get(entryId) || {
+            id, entryId, name: personName(u, kind), units: [], groupLeader: u.groupLeader, base: u.base,
+            contextKey: context.key, contextLabel: context.label, subject: context.subject, grade: context.grade,
+        };
+        item.units.push(u); map.set(entryId, item);
+    });
+    return [...map.values()].map(item => {
+        const agg = HXD.agg(item.units, opt);
+        return Object.assign(item, { agg, value: M[key].num(agg) });
+    });
+}
+function orderedRankMeta(rows, key, identity = r => r.entryId, includeRisk = false) {
+    const ordered = rows.filter(r => r.value != null && isFinite(r.value))
+        .sort((a, b) => M[key].better === 'lower' ? a.value - b.value : b.value - a.value);
+    const riskCount = includeRisk && ordered.length >= 2 ? Math.max(1, Math.ceil(ordered.length * .1)) : 0;
+    const riskIds = new Set(ordered.slice(-riskCount).map(identity));
+    const meta = new Map();
+    ordered.forEach((r, i) => meta.set(identity(r), {
+        rank: i + 1, peerCount: ordered.length, risk: riskIds.has(identity(r)),
+    }));
+    return meta;
+}
+function contextRankMeta(rows, key, includeRisk = false) {
+    const byContext = new Map(), meta = new Map();
+    rows.forEach(r => {
+        const list = byContext.get(r.contextKey) || [];
+        list.push(r); byContext.set(r.contextKey, list);
+    });
+    byContext.forEach(contextRows => orderedRankMeta(contextRows, key, r => r.entryId, includeRisk)
+        .forEach((value, id) => meta.set(id, value)));
+    return meta;
+}
+function teacherGroupRankMeta(peerUnits, key, opt) {
+    const people = new Map();
+    peerUnits.forEach(u => {
+        const id = personKey(u, 'teacher');
+        if (!id || !u.groupLeader) return;
+        // 组长可能覆盖多个年级，组内池只按基地+组长聚合，不按年级/学科拆分。
+        const groupKey = `${u.base || ''}|${u.groupLeader}`;
+        const identity = `${groupKey}@@${String(id)}`;
+        const item = people.get(identity) || { id, identity, groupKey, units: [] };
+        item.units.push(u); people.set(identity, item);
+    });
+    const byGroup = new Map(), meta = new Map();
+    [...people.values()].forEach(item => {
+        const agg = HXD.agg(item.units, opt);
+        const row = Object.assign(item, { agg, value: M[key].num(agg) });
+        const list = byGroup.get(item.groupKey) || [];
+        list.push(row); byGroup.set(item.groupKey, list);
+    });
+    byGroup.forEach(rows => orderedRankMeta(rows, key, r => r.identity, false)
+        .forEach((value, id) => meta.set(id, value)));
+    return meta;
+}
+function personRows(scopeUnits, peerUnits, kind, key, opt, localPeerUnits = scopeUnits) {
+    const nationalPeers = packPersonRows(peerUnits, kind, key, opt);
+    const nationalMeta = contextRankMeta(nationalPeers, key, true);
+    const localGroupMeta = kind === 'group'
+        ? contextRankMeta(packPersonRows(localPeerUnits, kind, key, opt), key, false)
+        : null;
+    const groupTeacherMeta = kind === 'teacher' ? teacherGroupRankMeta(teamComparisonUnits(), key, opt) : null;
+    return packPersonRows(scopeUnits, kind, key, opt).map(r => {
+        const primary = nationalMeta.get(r.entryId);
+        const result = primary
+            ? Object.assign(r, { scopeUnits: r.units }, primary)
+            : Object.assign(r, { rank: null, peerCount: 0, risk: false });
+        if (kind === 'group') {
+            const secondary = localGroupMeta.get(r.entryId);
+            result.secondaryRank = secondary && secondary.peerCount > 1 ? secondary.rank : null;
+            result.secondaryPeerCount = secondary && secondary.peerCount > 1 ? secondary.peerCount : 0;
+            result.secondaryLabel = '当前范围排名';
+        } else {
+            const groupKey = `${r.base || ''}|${r.groupLeader || ''}`;
+            const secondary = groupTeacherMeta.get(`${groupKey}@@${String(r.id)}`);
+            result.secondaryRank = secondary && secondary.peerCount > 1 ? secondary.rank : null;
+            result.secondaryPeerCount = secondary && secondary.peerCount > 1 ? secondary.peerCount : 0;
+            result.secondaryLabel = '组内排名';
+        }
+        result.primaryLabel = kind === 'group'
+            ? `全国${r.subject}组长排名`
+            : `全国${r.grade}·${r.subject}辅导排名`;
+        return result;
+    }).sort((a, b) => (+b.risk - +a.risk) || a.contextLabel.localeCompare(b.contextLabel, 'zh-CN') || ((a.rank || Infinity) - (b.rank || Infinity)) || a.name.localeCompare(b.name, 'zh-CN'));
+}
+function riskBasisText(key, opt, kind, row) {
+    const scope = row && row.contextLabel
+        ? `全国${row.contextLabel}`
+        : (kind === 'group' ? '全国各学科组长分别' : '全国各年级·学科辅导分别');
+    return `风险依据：${M[key].name}｜${lectureScopeText(opt)}｜${scope}末位 10%`;
+}
+function personRiskStatusText(key, opt, person) {
+    const prefix = `风险判断：${M[key].name}｜${lectureScopeText(opt)}`;
+    if (!person.rank || person.peerCount < 2) return `${prefix}｜暂无可比`;
+    return `${prefix}｜全国排名 ${person.rank}/${person.peerCount}｜${person.risk ? `末位10% · <span class="hx-risk-badge">需关注</span>` : '非末位10%'}`;
+}
+function secondaryRankText(person) {
+    return person.secondaryRank && person.secondaryPeerCount > 1
+        ? `${person.secondaryLabel} ${person.secondaryRank}/${person.secondaryPeerCount}`
+        : '';
+}
+function personRankHtml(person) {
+    const primary = person.rank ? `${person.rank}/${person.peerCount}` : '暂无可比';
+    const secondary = secondaryRankText(person);
+    return `<div class="rank-line"><span class="rank-scope">${person.primaryLabel || '全国排名'}</span><b>${primary}</b></div>${secondary ? `<div class="rank-line secondary"><span class="rank-scope">${person.secondaryLabel}</span><b>${person.secondaryRank}/${person.secondaryPeerCount}</b></div>` : ''}`;
+}
+function tableRankHtml(person) {
+    const primary = person.rank ? `${person.rank}/${person.peerCount}` : '—';
+    const secondary = secondaryRankText(person);
+    return `<div class="hx-table-ranks"><span>全国<b>${primary}</b></span>${secondary ? `<span>${person.secondaryLabel.replace('排名', '')}<b>${person.secondaryRank}/${person.secondaryPeerCount}</b></span>` : ''}</div>`;
+}
+function contextWithLecture(context, opt) {
+    const scope = lectureScopeText(opt);
+    const compact = value => String(value || '').replace(/\s+/g, '');
+    return compact(context).includes(compact(scope)) ? context : `${context} · ${scope}`;
+}
+function personRowsHtml(rows, kind, key, onlyRisk) {
+    const filtered = onlyRisk ? rows.filter(r => r.risk) : rows;
+    if (!filtered.length) return `<div class="hx-empty">${onlyRisk ? `当前筛选暂无${M[key].name}需关注人员` : '当前筛选条件下暂无人员'}</div>`;
+    return filtered.map(r => {
+        const childCount = kind === 'group' ? new Set(r.units.map(u => u.teacherId || u.teacherName)).size : 0;
+        const meta = `${personOrgPath(r, kind)}${kind === 'group' ? ` · 名下辅导：${childCount}人` : ''}`;
+        return `<div class="hx-person-row ${r.risk ? 'hx-risk-row' : ''}" data-person-kind="${kind}" data-person-id="${esc(String(r.id))}" data-person-entry="${encodeURIComponent(r.entryId)}">
+            <div><b>${r.name}</b>${r.risk ? ` <span class="hx-risk-badge">${riskLabel(key)}</span>` : ''}<span class="meta">${meta}</span></div>
+            <div class="num">${fmtM(key, r.value)}</div><div class="rank">${personRankHtml(r)}</div>
+        </div>`;
+    }).join('');
+}
+function openPersonDrawer(row, kind, initialKey, opt, peerUnits, localPeerUnits, contextTitle) {
+    const drawerId = `person-detail-${++detailDrawerSeq}`;
+    const drawerState = { key: initialKey, childOnlyRisk: false, lectureOnlyRisk: false, tab: 'lectures' };
+    HXUI.drawerPush(`${row.name} · ${row.contextLabel} · 人员详情`, `<div id="${drawerId}"></div>`, 'max-w-6xl');
+    const host = document.getElementById(drawerId);
+    function renderPersonDetail() {
+        const key = drawerState.key;
+        const personAgg = HXD.agg(row.units, opt);
+        const allRows = personRows(row.units, peerUnits, kind, key, opt, localPeerUnits);
+        const person = allRows.find(r => r.entryId === row.entryId) || Object.assign({}, row, { rank: null, peerCount: 0, risk: false });
+        const childRows = kind === 'group' ? personRows(row.units, peerUnits, 'teacher', key, opt, localPeerUnits) : [];
+        const contextLectures = opt && opt.lectures && opt.lectures.size < HXD.LECTURE_COUNT ? new Set(opt.lectures) : new Set();
+        const lectureRows = Array.from({ length: HXD.LECTURE_COUNT }, (_, i) => {
+            const n = i + 1, lo = { lectures: new Set([n]) }, a = HXD.agg(row.units, lo);
+            const peer = personRows(row.units, peerUnits, kind, key, lo, localPeerUnits).find(r => r.entryId === row.entryId) || {};
+            return {
+                n, a, risk: !!peer.risk, rank: peer.rank, peerCount: peer.peerCount,
+                secondaryRank: peer.secondaryRank, secondaryPeerCount: peer.secondaryPeerCount,
+                secondaryLabel: peer.secondaryLabel, primaryLabel: peer.primaryLabel,
+                contextLabel: peer.contextLabel || row.contextLabel,
+            };
+        });
+        const lectureRiskCount = lectureRows.filter(r => r.risk).length;
+        if (!lectureRiskCount) drawerState.lectureOnlyRisk = false;
+        const visibleLectureRows = drawerState.lectureOnlyRisk ? lectureRows.filter(r => r.risk) : lectureRows;
+        const metricHeads = ALL_KEYS.map(k => `<th class="px-3 py-2 text-right ${k === key ? 'is-focus-col' : ''}">${M[k].name}</th>`).join('');
+        const lectureBody = visibleLectureRows.map(r => {
+            const current = contextLectures.has(r.n);
+            return `<tr class="border-t border-hxline-light ${r.risk ? 'hx-risk-row' : ''} ${current ? 'is-current' : ''}" data-person-lecture="${r.n}">
+                <td class="px-3 py-2.5 font-medium">第${r.n}讲${current ? '<span class="hx-current-lecture">当前范围</span>' : ''}</td>
+                ${ALL_KEYS.map(k => `<td class="px-3 py-2.5 text-right ${k === key ? 'is-focus-col' : ''}">${fmtM(k, M[k].num(r.a))}</td>`).join('')}
+                <td class="px-3 py-2.5 text-right">${tableRankHtml(r)}</td>
+                <td class="px-3 py-2.5 text-right">${r.risk ? `<span class="hx-risk-badge">${riskLabel(key)}</span>` : '—'}</td>
+            </tr>`;
+        }).join('');
+        const lectureRiskButton = `<button type="button" class="hx-lecture-risk-toggle ${drawerState.lectureOnlyRisk ? 'active' : ''}" data-lecture-risk ${lectureRiskCount ? '' : 'disabled'}>仅看${M[key].name}需关注 ${lectureRiskCount}讲</button>`;
+        const lecturePanel = `<div>
+            ${kind === 'group' ? '' : `<div class="hx-lecture-toolbar"><div class="hx-lecture-toolbar-title">${drawerState.lectureOnlyRisk ? `${M[key].name}需关注讲次` : '全部已结束讲次'} · 8项指标<span>当前关注：${M[key].name}</span></div>${lectureRiskButton}</div>`}
+            <div class="hx-lecture-scroll"><table class="hx-lecture-table w-full text-[11px]"><thead><tr class="bg-[#f4f7fb] text-muted"><th class="px-3 py-2 text-left">讲次</th>${metricHeads}<th class="px-3 py-2 text-right">全国排名 / 辅助排名</th><th class="px-3 py-2 text-right">状态</th></tr></thead><tbody>${lectureBody}</tbody></table></div>
+            <div data-person-lecture-detail class="px-4 pb-3"></div>
+        </div>`;
+        const childSummary = personRowsSummary(childRows);
+        if (!childSummary.riskContexts) drawerState.childOnlyRisk = false;
+        const childrenPanel = `<div>
+            <div class="hx-person-list-head"><span>辅导 / 组织架构</span><span>${M[key].name}</span><span>全国排名 / 组内排名</span></div>
+            <div data-person-children>${personRowsHtml(childRows, 'teacher', key, drawerState.childOnlyRisk)}</div>
+        </div>`;
+        const childRiskButton = `<button type="button" class="hx-child-risk-toggle ${drawerState.childOnlyRisk ? 'active' : ''}" data-person-risk-filter ${childSummary.riskContexts ? '' : 'disabled'}>仅看${M[key].name}需关注 ${riskSummaryText(childSummary)}</button>`;
+        const groupTabs = `<div class="hx-person-detail-tabs">
+            <button class="${drawerState.tab === 'lectures' ? 'active' : ''}" data-person-tab="lectures">逐讲表现</button>
+            <button class="${drawerState.tab === 'children' ? 'active' : ''}" data-person-tab="children">名下辅导 ${childSummary.people}人</button>
+            <div class="hx-person-detail-action">${drawerState.tab === 'lectures' ? lectureRiskButton : childRiskButton}</div>
+        </div>`;
+        host.innerHTML = `
+            <div class="bg-brand-50 border border-brand-200 rounded-xl px-4 py-3">
+                <div class="hx-drawer-focus">
+                    <div class="hx-drawer-focus-main">
+                        <div class="hx-drawer-focus-label"><b>${contextWithLecture(contextTitle || '当前范围', opt)}</b></div>
+                        <div class="hx-person-org">${personOrgPath(row, kind)}</div>
+                        <div class="text-[11px] text-brand-700 mt-2">${personRiskStatusText(key, opt, person)}</div>
+                        ${secondaryRankText(person) ? `<div class="hx-detail-ranks"><span>${person.secondaryLabel}<b>${person.secondaryRank}/${person.secondaryPeerCount}</b></span></div>` : ''}
+                        <div class="text-[10px] text-muted mt-1">${M[key].formula}</div>
+                    </div>
+                </div>
+            </div>
+            ${drawerMetricCardsHtml(personAgg, key)}
+            <div class="bg-white rounded-2xl border border-hxline overflow-hidden">
+                ${kind === 'group' ? `${groupTabs}${drawerState.tab === 'lectures' ? lecturePanel : childrenPanel}` : lecturePanel}
+            </div>`;
+        host.querySelectorAll('[data-drawer-metric]').forEach(card => card.onclick = () => {
+            drawerState.key = card.dataset.drawerMetric;
+            drawerState.childOnlyRisk = false;
+            renderPersonDetail();
+        });
+        host.querySelectorAll('[data-person-tab]').forEach(tab => tab.onclick = () => { drawerState.tab = tab.dataset.personTab; renderPersonDetail(); });
+        const lectureRiskToggle = host.querySelector('[data-lecture-risk]');
+        if (lectureRiskToggle && !lectureRiskToggle.disabled) lectureRiskToggle.onclick = () => { drawerState.lectureOnlyRisk = !drawerState.lectureOnlyRisk; renderPersonDetail(); };
+        const childRiskToggle = host.querySelector('[data-person-risk-filter]');
+        if (childRiskToggle && !childRiskToggle.disabled) childRiskToggle.onclick = () => { drawerState.childOnlyRisk = !drawerState.childOnlyRisk; renderPersonDetail(); };
+        function bindChildPeople(container, rows, childOpt, label) {
+            if (!container) return;
+            container.querySelectorAll('[data-person-entry]').forEach(el => el.onclick = () => {
+                const child = rows.find(r => r.entryId === decodeURIComponent(el.dataset.personEntry));
+                if (child) openPersonDrawer(child, 'teacher', key, childOpt, peerUnits, localPeerUnits, label);
+            });
+        }
+        bindChildPeople(host.querySelector('[data-person-children]'), childRows, opt, `${row.name} 名下辅导`);
+        host.querySelectorAll('[data-person-lecture]').forEach(el => el.onclick = () => {
+            const n = +el.dataset.personLecture, lo = { lectures: new Set([n]) };
+            const detailHost = host.querySelector('[data-person-lecture-detail]');
+            if (kind === 'group') {
+                const rows = personRows(row.units, peerUnits, 'teacher', key, lo, localPeerUnits);
+                detailHost.innerHTML = `<div class="text-[12px] font-medium text-ink mt-3 mb-2">第${n}讲 · 名下全部辅导 · 当前关注${M[key].name}</div>${personRowsHtml(rows, 'teacher', key, false)}`;
+                bindChildPeople(detailHost, rows, lo, `${row.name} · 第${n}讲`);
+            } else {
+                const r = lectureRows.find(x => x.n === n);
+                detailHost.innerHTML = `<div class="text-[12px] text-sub mt-3">第${n}讲 · ${M[key].name} <b class="text-ink">${fmtM(key, M[key].num(r.a))}</b> · 全国排名 ${r.rank ? `${r.rank}/${r.peerCount}` : '暂无可比'}${secondaryRankText(r) ? ` · ${secondaryRankText(r)}` : ''}${r.risk ? ` · <span class="hx-risk-badge">${riskLabel(key)}</span>` : ''}</div>`;
+            }
+        });
+    }
+    renderPersonDetail();
+}
+function openScopeDrawer(node, focusMetric, ctx = {}) {
+    const opt = ctx.opt || aggOpt();
+    const peerUnits = ctx.peerUnits || comparisonUnits();
+    const localPeerUnits = node.units;
+    const drawerId = `scope-detail-${++detailDrawerSeq}`;
+    const drawerState = {
+        key: focusMetric || state.ov.key, kind: 'group', onlyRisk: false,
+        groupBase: null, groupSubject: null,
+        teacherBase: null, teacherGrades: new Set(), teacherSubjects: new Set(),
+    };
+    HXUI.drawerPush(`${node.path.join(' / ')} · 范围详情`, `<div id="${drawerId}"></div>`, 'max-w-5xl');
+    const host = document.getElementById(drawerId);
+    const orderedFilterValues = (values, order) => [...new Set(values.filter(Boolean))].sort((a, b) => {
+        const ai = order.indexOf(a), bi = order.indexOf(b);
+        return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi) || a.localeCompare(b, 'zh-CN');
+    });
+    const toggleMultiFilter = (set, value) => {
+        if (value === '__all__') { set.clear(); return; }
+        if (!set.size) { set.add(value); return; }
+        if (set.has(value)) set.delete(value); else set.add(value);
+    };
+    const filterChip = (label, value, active, attr) => `<button type="button" class="hx-person-filter-chip ${active ? 'active' : ''}" ${attr}="${encodeURIComponent(value)}">${label}</button>`;
+    function renderScopeDetail() {
+        const key = drawerState.key;
+        const a = HXD.agg(node.units, opt);
+        const groupRows = personRows(node.units, peerUnits, 'group', key, opt, localPeerUnits);
+        const teacherRows = personRows(node.units, peerUnits, 'teacher', key, opt, localPeerUnits);
+        const groupSummary = personRowsSummary(groupRows);
+        const teacherSummary = personRowsSummary(teacherRows);
+        const rows = drawerState.kind === 'group' ? groupRows : teacherRows;
+        const groupBases = orderedFilterValues(groupRows.flatMap(r => r.units.map(u => u.base)), ORG.bases);
+        const groupSubjects = orderedFilterValues(groupRows.map(r => r.subject), ORG.subjects);
+        const teacherBases = orderedFilterValues(teacherRows.flatMap(r => r.units.map(u => u.base)), ORG.bases);
+        const teacherGrades = orderedFilterValues(teacherRows.map(r => r.grade), GRADE_ORDER);
+        const teacherSubjects = orderedFilterValues(teacherRows.map(r => r.subject), ORG.subjects);
+        const inBase = (row, base) => !base || row.units.some(u => u.base === base);
+        const filteredRows = drawerState.kind === 'group'
+            ? rows.filter(r => inBase(r, drawerState.groupBase) && (!drawerState.groupSubject || r.subject === drawerState.groupSubject))
+            : rows.filter(r => inBase(r, drawerState.teacherBase) && (!drawerState.teacherGrades.size || drawerState.teacherGrades.has(r.grade)) && (!drawerState.teacherSubjects.size || drawerState.teacherSubjects.has(r.subject)));
+        const filteredSummary = personRowsSummary(filteredRows);
+        const groupBaseHtml = groupBases.length > 1 ? `<div class="hx-person-filter-row">
+            <span class="hx-person-filter-label">基地</span><div class="hx-person-filter-chips">
+                ${filterChip('全部', '__all__', !drawerState.groupBase, 'data-group-base')}
+                ${groupBases.map(base => filterChip(base, base, drawerState.groupBase === base, 'data-group-base')).join('')}
+            </div></div>` : '';
+        const groupFilterHtml = groupSubjects.length > 1 ? `<div class="hx-person-filter-row">
+            <span class="hx-person-filter-label">学科</span><div class="hx-person-filter-chips">
+                ${filterChip('全部', '__all__', !drawerState.groupSubject, 'data-group-subject')}
+                ${groupSubjects.map(subject => filterChip(subject, subject, drawerState.groupSubject === subject, 'data-group-subject')).join('')}
+            </div></div>` : '';
+        const teacherBaseHtml = teacherBases.length > 1 ? `<div class="hx-person-filter-row">
+            <span class="hx-person-filter-label">基地</span><div class="hx-person-filter-chips">
+                ${filterChip('全部', '__all__', !drawerState.teacherBase, 'data-teacher-base')}
+                ${teacherBases.map(base => filterChip(base, base, drawerState.teacherBase === base, 'data-teacher-base')).join('')}
+            </div></div>` : '';
+        const teacherGradeHtml = teacherGrades.length > 1 ? `<div class="hx-person-filter-row">
+            <span class="hx-person-filter-label">年级</span><div class="hx-person-filter-chips">
+                ${filterChip('全部', '__all__', !drawerState.teacherGrades.size, 'data-teacher-grade')}
+                ${teacherGrades.map(grade => filterChip(grade, grade, drawerState.teacherGrades.has(grade), 'data-teacher-grade')).join('')}
+            </div></div>` : '';
+        const teacherSubjectHtml = teacherSubjects.length > 1 ? `<div class="hx-person-filter-row">
+            <span class="hx-person-filter-label">学科</span><div class="hx-person-filter-chips">
+                ${filterChip('全部', '__all__', !drawerState.teacherSubjects.size, 'data-teacher-subject')}
+                ${teacherSubjects.map(subject => filterChip(subject, subject, drawerState.teacherSubjects.has(subject), 'data-teacher-subject')).join('')}
+            </div></div>` : '';
+        const filterRowsHtml = drawerState.kind === 'group' ? groupBaseHtml + groupFilterHtml : teacherBaseHtml + teacherGradeHtml + teacherSubjectHtml;
+        const filterBarHtml = filterRowsHtml ? `<div class="hx-person-filterbar">
+            <div class="hx-person-filter-head"><b>快速筛选</b><span class="hx-person-filter-summary">当前结果：${drawerState.kind === 'group' ? '组长' : '辅导'} ${filteredSummary.people}人｜需关注 ${riskSummaryText(filteredSummary)}</span></div>
+            ${filterRowsHtml}
+        </div>` : '';
+        host.innerHTML = `
+            <div class="bg-brand-50 border border-brand-200 rounded-xl px-4 py-3">
+                <div class="hx-drawer-focus">
+                    <div class="hx-drawer-focus-main">
+                        <div class="hx-drawer-focus-label"><b>${ctx.source || '当前范围'}</b><span>·</span><span>${contextWithLecture(node.path.join(' / '), opt)}</span></div>
+                        <div class="text-[11px] text-brand-700 mt-2">${riskBasisText(key, opt, drawerState.kind)}</div>
+                        <div class="text-[10px] text-muted mt-1">${M[key].formula}</div>
+                    </div>
+                </div>
+            </div>
+            ${drawerMetricCardsHtml(a, key)}
+            <div class="bg-white rounded-2xl border border-hxline overflow-hidden">
+                <div class="px-4 py-3 border-b border-hxline-light text-[13px] font-medium text-ink">人员排名与风险</div>
+                <div class="hx-scope-tabs px-3 pt-3"><button class="hx-scope-role-tab ${drawerState.kind === 'group' ? 'active' : ''}" data-scope-kind="group"><span>组长 ${groupSummary.people}人</span><span class="hx-role-risk-count ${groupSummary.riskContexts ? '' : 'zero'}">需关注 ${riskSummaryText(groupSummary)}</span></button><button class="hx-scope-role-tab ${drawerState.kind === 'teacher' ? 'active' : ''}" data-scope-kind="teacher"><span>辅导 ${teacherSummary.people}人</span><span class="hx-role-risk-count ${teacherSummary.riskContexts ? '' : 'zero'}">需关注 ${riskSummaryText(teacherSummary)}</span></button><button class="hx-risk-filter ${drawerState.onlyRisk ? 'active' : ''}" data-scope-risk>仅看${M[key].name}需关注 ${riskSummaryText(filteredSummary)}</button></div>
+                ${filterBarHtml}
+                <div class="hx-person-list-head"><span>人员 / 组织架构</span><span>${M[key].name}</span><span>全国排名 / 辅助排名</span></div>
+                <div data-scope-people>${personRowsHtml(filteredRows, drawerState.kind, key, drawerState.onlyRisk)}</div>
+            </div>`;
+        host.querySelectorAll('[data-drawer-metric]').forEach(card => card.onclick = () => { drawerState.key = card.dataset.drawerMetric; renderScopeDetail(); });
+        host.querySelectorAll('[data-scope-kind]').forEach(b => b.onclick = () => { drawerState.kind = b.dataset.scopeKind; drawerState.onlyRisk = false; renderScopeDetail(); });
+        host.querySelector('[data-scope-risk]').onclick = () => { drawerState.onlyRisk = !drawerState.onlyRisk; renderScopeDetail(); };
+        host.querySelectorAll('[data-group-base]').forEach(button => button.onclick = () => {
+            const value = decodeURIComponent(button.dataset.groupBase);
+            drawerState.groupBase = value === '__all__' ? null : value;
+            renderScopeDetail();
+        });
+        host.querySelectorAll('[data-group-subject]').forEach(button => button.onclick = () => {
+            const value = decodeURIComponent(button.dataset.groupSubject);
+            drawerState.groupSubject = value === '__all__' ? null : value;
+            renderScopeDetail();
+        });
+        host.querySelectorAll('[data-teacher-base]').forEach(button => button.onclick = () => {
+            const value = decodeURIComponent(button.dataset.teacherBase);
+            drawerState.teacherBase = value === '__all__' ? null : value;
+            renderScopeDetail();
+        });
+        host.querySelectorAll('[data-teacher-grade]').forEach(button => button.onclick = () => {
+            toggleMultiFilter(drawerState.teacherGrades, decodeURIComponent(button.dataset.teacherGrade));
+            renderScopeDetail();
+        });
+        host.querySelectorAll('[data-teacher-subject]').forEach(button => button.onclick = () => {
+            toggleMultiFilter(drawerState.teacherSubjects, decodeURIComponent(button.dataset.teacherSubject));
+            renderScopeDetail();
+        });
+        host.querySelectorAll('[data-scope-people] [data-person-entry]').forEach(el => el.onclick = () => {
+            const row = filteredRows.find(r => r.entryId === decodeURIComponent(el.dataset.personEntry));
+            if (row) openPersonDrawer(row, drawerState.kind, key, opt, peerUnits, localPeerUnits, node.path.join(' / '));
+        });
+    }
+    renderScopeDetail();
+}
+
+// ================= 事件绑定 =================
+document.addEventListener('hx-query-apply', () => {
+    state.applied = JSON.parse(JSON.stringify(state.draft));
+    state.focusLecture = null;
+    render();
+});
+document.addEventListener('hx-query-reset', () => {
+    state.draft = filterDefaults();
+    state.applied = filterDefaults();
+    state.focusLecture = null;
+    render();
+});
+HX_ROLE.onChange(render);
+
+render();
+</script>
+</body>
+</html>

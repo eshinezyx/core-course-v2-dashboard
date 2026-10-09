@@ -1,0 +1,162 @@
+/* =========================================================
+ * HX_Dashboard hx-theme.css — V9 骨架主题 + 恒行电蓝
+ * 策略：indigo 工具类重定向（v1 页面零改动换肤）+ 组件级深藏青侧栏
+ * 分位四色 + 五级字号 + 金色我的范围徽章
+ * ========================================================= */
+
+:root {
+    --hx-ink: #14213d;
+    --hx-sub: #60708d;
+    --hx-muted: #8b98ad;
+    --hx-line: #dbe3ef;
+    --hx-line2: #edf1f7;
+    --hx-paper: #f4f6f9;
+    --hx-nav: #111b31;
+    --hx-nav2: #202c44;
+    --hx-blue: #2f6fed;
+    --hx-blue2: #2463df;
+    --hx-blue3: #5b8ff9;
+    --hx-mint: #edf4ff;
+    --hx-mint2: #dce9ff;
+    /* 分位四色（V9 语义） */
+    --hx-lead: #c9efe1;   /* 领先 top25% */
+    --hx-normal: #e7f0fb; /* 正常 */
+    --hx-low: #ffebbd;    /* 偏低 bottom40% */
+    --hx-risk: #f9d7dc;   /* 需关注 bottom25% */
+    /* 字号（V9 五级体系） */
+    --hx-fs-title: 20px;
+    --hx-fs-section: 17px;
+    --hx-fs-body: 13px;
+    --hx-fs-ui: 12px;
+    --hx-fs-caption: 11px;
+    --hx-fs-dense: 10px;
+}
+
+html, body { background: #f4f6f9; }
+
+body {
+    font-family: Inter, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--hx-ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* ========= indigo → 电蓝重定向（v1 页面换肤核心） ========= */
+.bg-indigo-500 { background-color: #2f6fed !important; }
+.bg-indigo-600 { background-color: #245fd4 !important; }
+.bg-indigo-50 { background-color: #edf4ff !important; }
+.bg-indigo-100 { background-color: #dce9ff !important; }
+.bg-indigo-500\/30 { background-color: rgba(47, 111, 237, .3) !important; }
+.bg-indigo-300 { background-color: #8cabe0 !important; }
+.bg-indigo-400 { background-color: #6f9bea !important; }
+.text-indigo-600 { color: #2463df !important; }
+.text-indigo-500 { color: #2f6fed !important; }
+.text-indigo-400 { color: #3f7ee8 !important; }
+.border-indigo-200 { border-color: #9bb9ef !important; }
+.border-indigo-300 { border-color: #8cabe0 !important; }
+.border-indigo-500 { border-color: #2f6fed !important; }
+.ring-indigo-200 { --tw-ring-color: #9bb9ef !important; }
+.focus\:ring-indigo-200:focus { --tw-ring-color: rgba(47, 111, 237, .18) !important; }
+.accent-indigo-500 { accent-color: #2f6fed !important; }
+
+/* slate → 蓝灰层级微调（保持 V9 质感但不破坏可读性） */
+.bg-slate-50 { background-color: #f4f6f9 !important; }
+.bg-slate-100\/70 { background-color: rgba(237, 241, 247, .7) !important; }
+
+/* ========= 深藏青侧栏（配合 common.js renderSidebar） ========= */
+.hx-side { background: #111b31 !important; border-right: 1px solid #1b2740 !important; }
+.hx-side .hx-brand small { color: #697997 !important; font-weight: 650 !important; }
+.hx-side .hx-brand b { color: #fff !important; font-weight: 700 !important; letter-spacing: .01em !important; }
+.hx-side .hx-nav-section { color: #58657d !important; font-weight: 600 !important; letter-spacing: .06em !important; font-size: var(--hx-fs-caption) !important; }
+.hx-side .hx-nav-item, .hx-side .hx-nav-sub { color: #8f9ab1 !important; font-size: var(--hx-fs-body) !important; line-height: 1.45 !important; }
+.hx-side .hx-nav-item:hover { color: #dbe4f2 !important; background: rgba(255, 255, 255, .035) !important; }
+.hx-side .hx-nav-sub:hover { color: #e5ebf5 !important; background: rgba(255, 255, 255, .05) !important; }
+.hx-side .hx-nav-item.active { color: #fff !important; background: #202c44 !important; font-weight: 650 !important; }
+.hx-side .hx-nav-sub.active { color: #fff !important; background: #2f6fed !important; font-weight: 650 !important; box-shadow: 0 7px 16px rgba(47, 111, 237, .24) !important; }
+.hx-side .hx-side-foot { color: #73819a !important; border-top: 1px solid rgba(197, 206, 222, .12) !important; }
+.hx-side .hx-logo { background: #2f6fed !important; color: #fff !important; }
+
+/* ========= 分位四色（组合矩阵单元格） ========= */
+.hx-cell-lead { background: var(--hx-lead) !important; }
+.hx-cell-normal { background: var(--hx-normal) !important; }
+.hx-cell-low { background: var(--hx-low) !important; }
+.hx-cell-risk { background: var(--hx-risk) !important; }
+
+/* ========= 「我的范围」金色徽章 ========= */
+.hx-owned-badge {
+    display: inline-flex; align-items: center;
+    margin-left: 6px; padding: 1px 5px;
+    border-radius: 3px;
+    background: #fff2d9 !important;
+    color: #9a6515 !important;
+    font-size: 9px !important;
+    font-style: normal !important;
+    font-weight: 600 !important;
+    line-height: 1.45 !important;
+    white-space: nowrap !important;
+}
+
+/* ========= 角色范围开关 ========= */
+.hx-role-scope-switch {
+    display: inline-flex; align-items: center; gap: 2px;
+    padding: 2px; border: 1px solid #d9e5f0;
+    border-radius: 6px; background: #f5f8fc;
+}
+.hx-role-scope-switch button {
+    border: 0; border-radius: 4px; background: transparent;
+    padding: 4px 9px; color: #66758f;
+    font-size: var(--hx-fs-caption); cursor: pointer;
+    font-family: inherit; transition: background-color .15s, color .15s;
+}
+.hx-role-scope-switch button:hover { color: #2463df; }
+.hx-role-scope-switch button.active {
+    color: #fff !important;
+    background: #2f6fed !important;
+    box-shadow: 0 3px 9px rgba(47, 111, 237, .18);
+}
+
+/* ========= 栈式抽屉（v2 页面） ========= */
+.hx-drawer-overlay { position: fixed; inset: 0; z-index: 50; }
+.hx-drawer-panel {
+    position: absolute; right: 0; top: 0; bottom: 0; width: min(66vw, 1080px);
+    background: #f7f9fc; box-shadow: -18px 0 48px rgba(17, 27, 49, .18);
+    display: flex; flex-direction: column;
+    transition: transform .25s ease;
+}
+.hx-drawer-head {
+    background: #fff; border-bottom: 1px solid var(--hx-line);
+    padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;
+}
+
+/* ========= query-first 筛选条 ========= */
+.hx-pending { color: #b45309 !important; background: #fffbeb !important; border-color: #fde68a !important; }
+
+/* ========= 组合矩阵 ========= */
+.hx-matrix-table th { background: #f4f7fb !important; color: #50617e !important; border-color: var(--hx-line) !important; font-size: var(--hx-fs-caption) !important; }
+.hx-matrix-table td { border-color: var(--hx-line2) !important; }
+.hx-matrix-table tr:hover td { background: #f8faff !important; }
+.hx-cell-top { font-size: 15px; font-weight: 600; color: #163563; font-variant-numeric: tabular-nums; }
+.hx-cell-bottom { font-size: var(--hx-fs-dense); color: #71819b; }
+.hx-dim-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #edf4ff !important; border: 1px solid #c7d8f5 !important;
+    border-radius: 5px; padding: 2px 7px; font-size: var(--hx-fs-ui);
+    color: #1e5dcc !important;
+}
+.hx-dim-chip button { color: #5279b7; border: 0; background: transparent; cursor: pointer; font-size: 12px; }
+.hx-dim-chip button:disabled { opacity: .3; cursor: default; }
+
+/* ========= 工具 ========= */
+.hx-toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+    background: #111b31; color: #fff; padding: 9px 18px; border-radius: 8px;
+    font-size: var(--hx-fs-ui); z-index: 99;
+    box-shadow: 0 8px 24px rgba(17, 27, 49, .3);
+    animation: hx-fade-in .18s ease;
+}
+@keyframes hx-fade-in { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: #c3cddd; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a4b3c9; }
